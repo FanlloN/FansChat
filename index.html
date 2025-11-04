@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Clone</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📱</text></svg>">
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+        import { getDatabase, ref, set, onValue, push, update, remove, get, query, orderByChild, limitToLast } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+        import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-storage.js";
+
+        // Firebase configuration - REPLACE WITH YOUR OWN CONFIG
+        const firebaseConfig = {
+            apiKey: "your-actual-api-key",
+            authDomain: "your-project.firebaseapp.com",
+            databaseURL: "https://your-project-default-rtdb.firebaseio.com",
+            projectId: "your-project-id",
+            storageBucket: "your-project.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "your-app-id"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const database = getDatabase(app);
+        const storage = getStorage(app);
+
+        // Make Firebase functions available globally
+        window.auth = auth;
+        window.database = database;
+        window.storage = storage;
+        window.signInWithEmailAndPassword = signInWithEmailAndPassword;
+        window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
+        window.signOut = signOut;
+        window.onAuthStateChanged = onAuthStateChanged;
+        window.dbRef = ref;
+        window.set = set;
+        window.onValue = onValue;
+        window.push = push;
+        window.update = update;
+        window.remove = remove;
+        window.get = get;
+        window.query = query;
+        window.orderByChild = orderByChild;
+        window.limitToLast = limitToLast;
+        window.storageRef = storageRef;
+        window.uploadBytes = uploadBytes;
+        window.getDownloadURL = getDownloadURL;
+    </script>
+</head>
+<body>
+    <!-- Auth Screen -->
+    <div id="authScreen" class="auth-screen">
+        <div class="auth-container">
+            <div class="auth-header">
+                <div class="telegram-icon">📱</div>
+                <h1>Telegram Clone</h1>
+                <p>Быстрый и безопасный мессенджер</p>
+            </div>
+
+            <!-- Login Form -->
+            <div id="loginForm" class="auth-form">
+                <h2>Вход</h2>
+                <input type="email" id="loginEmail" placeholder="Email" required>
+                <input type="password" id="loginPassword" placeholder="Пароль" required>
+                <button id="loginBtn" class="auth-btn">Войти</button>
+                <p class="auth-switch">Нет аккаунта? <a href="#" id="showRegister">Зарегистрироваться</a></p>
+            </div>
+
+            <!-- Register Form -->
+            <div id="registerForm" class="auth-form" style="display: none;">
+                <h2>Регистрация</h2>
+                <input type="text" id="registerUsername" placeholder="Имя пользователя" required>
+                <input type="email" id="registerEmail" placeholder="Email" required>
+                <input type="password" id="registerPassword" placeholder="Пароль" required>
+                <button id="registerBtn" class="auth-btn">Создать аккаунт</button>
+                <p class="auth-switch">Уже есть аккаунт? <a href="#" id="showLogin">Войти</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app" class="app" style="display: none;">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <!-- User Profile -->
+            <div class="user-profile">
+                <div class="user-avatar">
+                    <img id="userAvatar" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%23666666'/><text x='50' y='65' text-anchor='middle' fill='white' font-size='40'>👤</text></svg>" alt="Avatar">
+                </div>
+                <div class="user-info">
+                    <div class="user-name" id="userDisplayName">Пользователь</div>
+                    <div class="user-status">онлайн</div>
+                </div>
+                <button class="settings-btn" id="settingsBtn">⚙️</button>
+            </div>
+
+            <!-- Search -->
+            <div class="search-container">
+                <input type="text" id="searchInput" placeholder="Поиск чатов..." class="search-input">
+            </div>
+
+            <!-- Chats List -->
+            <div class="chats-list" id="chatsList">
+                <!-- Chats will be loaded here -->
+            </div>
+
+            <!-- New Chat Button -->
+            <button class="new-chat-btn" id="newChatBtn">
+                <span class="plus-icon">+</span>
+                Новый чат
+            </button>
+        </div>
+
+        <!-- Chat Area -->
+        <div class="chat-area" id="chatArea">
+            <!-- Empty State -->
+            <div class="empty-state" id="emptyState">
+                <div class="empty-icon">💬</div>
+                <h2>Выберите чат</h2>
+                <p>Начните общение с друзьями</p>
+            </div>
+
+            <!-- Chat Header -->
+            <div class="chat-header" id="chatHeader" style="display: none;">
+                <div class="chat-avatar">
+                    <img id="chatAvatar" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%23666666'/><text x='50' y='65' text-anchor='middle' fill='white' font-size='40'>👤</text></svg>" alt="Chat Avatar">
+                </div>
+                <div class="chat-info">
+                    <div class="chat-name" id="chatName">Чат</div>
+                    <div class="chat-status" id="chatStatus">был(а) недавно</div>
+                </div>
+                <div class="chat-actions">
+                    <button class="attach-btn" id="attachBtn">📎</button>
+                    <button class="menu-btn" id="chatMenuBtn">⋯</button>
+                </div>
+            </div>
+
+            <!-- Messages Container -->
+            <div class="messages-container" id="messagesContainer">
+                <!-- Messages will be loaded here -->
+            </div>
+
+            <!-- Message Input -->
+            <div class="message-input-container" id="messageInputContainer" style="display: none;">
+                <div class="message-input-wrapper">
+                    <button class="emoji-btn" id="emojiBtn">😊</button>
+                    <input type="text" id="messageInput" placeholder="Напишите сообщение..." class="message-input">
+                    <button class="send-btn" id="sendBtn">📤</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Emoji Picker (hidden by default) -->
+    <div class="emoji-picker" id="emojiPicker" style="display: none;">
+        <div class="emoji-grid">
+            😀 😃 😄 😁 😆 😅 😂 🤣 😊 😇 🙂 🙃 😉 😌 😍 🥰 😘 😗 😙 😚 😋 😛 😝 😜 🤪 🤨 🧐 🤓 😎 🤩 🥳 😏 😒 😞 😔 😟 😕 🙁 ☹️ 😣 😖 😫 😩 🥺 😢 😭 😤 😠 😡 🤬 🤯 😳 🥵 🥶 😱 😨 😰 😥 😓 🤗 🤔 🤭 🤫 🤥 😶 😐 😑 😬 🙄 😯 😦 😧 😮 😲 🥱 😴 🤤 😪 😵 🤐 🥴 🤢 🤮 🤧 😷 🤒 🤕 🤑 🤠 😈 👿 👹 👺 🤡 💩 👻 💀 ☠️ 👽 👾 🤖 🎃 😺 😸 😹 😻 😼 😽 🙀 😿 😾
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div class="modal" id="newChatModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Новый чат</h3>
+                <button class="close-modal" id="closeNewChatModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="newChatUsername" placeholder="Имя пользователя" class="modal-input">
+                <button id="startNewChatBtn" class="modal-btn">Начать чат</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script src="auth.js"></script>
+    <script src="chat.js"></script>
+    <script src="ui.js"></script>
+</body>
+</html>
