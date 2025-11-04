@@ -58,28 +58,33 @@ async function loginUser() {
         loginBtn.innerHTML = '<div class="loading"></div>';
         loginBtn.disabled = true;
 
-        // Find user by username and get their email
-        const usersRef = window.dbRef(window.database, 'users');
-        const snapshot = await window.get(usersRef);
-        const usersData = snapshot.val();
+        // For now, use a simple approach - try to login with generated email pattern
+        // This is a temporary solution until proper user lookup is implemented
+        const possibleEmails = [
+            `${username}@chatbyfan.local`,
+            `${username}_${Date.now()}@chatbyfan.local`
+        ];
 
-        let userEmail = null;
-        for (const [uid, userData] of Object.entries(usersData || {})) {
-            if (userData.username === username) {
-                userEmail = userData.email;
+        let loginSuccess = false;
+        for (const email of possibleEmails) {
+            try {
+                await window.signInWithEmailAndPassword(window.auth, email, password);
+                loginSuccess = true;
                 break;
+            } catch (error) {
+                // Continue trying other emails
+                continue;
             }
         }
 
-        if (!userEmail) {
-            throw new Error('Пользователь не найден');
+        if (!loginSuccess) {
+            throw new Error('Неверный никнейм или пароль');
         }
 
-        await window.signInWithEmailAndPassword(window.auth, userEmail, password);
         // User will be handled by onAuthStateChanged
     } catch (error) {
         console.error('Login error:', error);
-        alert(error.message === 'Пользователь не найден' ? error.message : getAuthErrorMessage(error.code));
+        alert(error.message || getAuthErrorMessage(error.code));
         loginBtn.innerHTML = 'Войти';
         loginBtn.disabled = false;
     }
@@ -109,18 +114,8 @@ async function registerUser() {
         registerBtn.innerHTML = '<div class="loading"></div>';
         registerBtn.disabled = true;
 
-        // Check if username is already taken
-        const usersRef = window.dbRef(window.database, 'users');
-        const snapshot = await window.get(usersRef);
-        const usersData = snapshot.val() || {};
-
-        const usernameExists = Object.values(usersData).some(user => user.username === username);
-        if (usernameExists) {
-            throw new Error('Этот никнейм уже занят');
-        }
-
         // Generate a unique email for Firebase Auth (since we use username for login)
-        const uniqueEmail = `${username}_${Date.now()}@chatbyfan.local`;
+        const uniqueEmail = `${username}@chatbyfan.local`;
 
         // Create user account
         const userCredential = await window.createUserWithEmailAndPassword(window.auth, uniqueEmail, password);

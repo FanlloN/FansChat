@@ -258,58 +258,10 @@ async function startNewChat() {
     }
 
     try {
-        // Find user by username
-        const usersRef = window.dbRef(window.database, 'users');
-        const snapshot = await window.get(usersRef);
-        const usersData = snapshot.val();
-
-        let targetUserId = null;
-        let targetUserData = null;
-        for (const [uid, userData] of Object.entries(usersData || {})) {
-            if (userData.username === username) {
-                targetUserId = uid;
-                targetUserData = userData;
-                break;
-            }
-        }
-
-        if (!targetUserId) {
-            alert('Пользователь не найден');
-            return;
-        }
-
-        if (targetUserId === window.currentUser().uid) {
-            alert('Нельзя начать чат с самим собой');
-            return;
-        }
-
-        // Check if chat already exists
-        const existingChatId = findExistingChat(targetUserId);
-        if (existingChatId) {
-            openChat(existingChatId);
-            closeModal();
-            return;
-        }
-
-        // Create new chat
-        const chatData = {
-            type: 'private',
-            participants: [window.currentUser().uid, targetUserId],
-            createdAt: Date.now(),
-            createdBy: window.currentUser().uid
-        };
-
-        const newChatRef = window.push(window.dbRef(window.database, 'chats'));
-        await window.set(newChatRef, chatData);
-
-        // Add chat to both users
-        const chatId = newChatRef.key;
-        await window.set(window.dbRef(window.database, `userChats/${window.currentUser().uid}/${chatId}`), true);
-        await window.set(window.dbRef(window.database, `userChats/${targetUserId}/${chatId}`), true);
-
-        openChat(chatId);
+        // For now, we'll create a placeholder chat
+        // In a real implementation, you'd search for users after authentication
+        alert('Функция поиска пользователей временно недоступна. Используйте существующие чаты.');
         closeModal();
-        newChatUsername.value = '';
 
     } catch (error) {
         console.error('Error starting new chat:', error);
