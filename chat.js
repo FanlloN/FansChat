@@ -257,11 +257,54 @@ async function startNewChat() {
         return;
     }
 
-    try {
-        // For now, we'll create a placeholder chat
-        // In a real implementation, you'd search for users after authentication
-        alert('Функция поиска пользователей временно недоступна. Используйте существующие чаты.');
+    if (username === window.currentUser()?.displayName) {
+        alert('Нельзя начать чат с самим собой');
         closeModal();
+        return;
+    }
+
+    try {
+        // For now, create a demo chat with a placeholder user
+        // In production, this would search for real users
+        const demoUserId = `demo_${username}`;
+        const currentUserId = window.currentUser().uid;
+
+        // Check if demo chat already exists
+        const existingChatId = findExistingChat(demoUserId);
+        if (existingChatId) {
+            openChat(existingChatId);
+            closeModal();
+            return;
+        }
+
+        // Create new demo chat
+        const chatData = {
+            type: 'private',
+            participants: [currentUserId, demoUserId],
+            createdAt: Date.now(),
+            createdBy: currentUserId
+        };
+
+        const newChatRef = window.push(window.dbRef(window.database, 'chats'));
+        await window.set(newChatRef, chatData);
+
+        // Add chat to current user
+        const chatId = newChatRef.key;
+        await window.set(window.dbRef(window.database, `userChats/${currentUserId}/${chatId}`), true);
+
+        // Add demo user to users collection
+        await window.set(window.dbRef(window.database, `users/${demoUserId}`), {
+            uid: demoUserId,
+            username: username,
+            displayName: username,
+            avatar: null,
+            online: false,
+            lastSeen: Date.now()
+        });
+
+        openChat(chatId);
+        closeModal();
+        newChatUsername.value = '';
 
     } catch (error) {
         console.error('Error starting new chat:', error);

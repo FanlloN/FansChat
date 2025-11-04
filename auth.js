@@ -58,33 +58,14 @@ async function loginUser() {
         loginBtn.innerHTML = '<div class="loading"></div>';
         loginBtn.disabled = true;
 
-        // For now, use a simple approach - try to login with generated email pattern
-        // This is a temporary solution until proper user lookup is implemented
-        const possibleEmails = [
-            `${username}@chatbyfan.local`,
-            `${username}_${Date.now()}@chatbyfan.local`
-        ];
-
-        let loginSuccess = false;
-        for (const email of possibleEmails) {
-            try {
-                await window.signInWithEmailAndPassword(window.auth, email, password);
-                loginSuccess = true;
-                break;
-            } catch (error) {
-                // Continue trying other emails
-                continue;
-            }
-        }
-
-        if (!loginSuccess) {
-            throw new Error('Неверный никнейм или пароль');
-        }
+        // Try to login with the standard email pattern
+        const email = `${username}@chatbyfan.local`;
+        await window.signInWithEmailAndPassword(window.auth, email, password);
 
         // User will be handled by onAuthStateChanged
     } catch (error) {
         console.error('Login error:', error);
-        alert(error.message || getAuthErrorMessage(error.code));
+        alert('Неверный никнейм или пароль');
         loginBtn.innerHTML = 'Войти';
         loginBtn.disabled = false;
     }
