@@ -20,6 +20,8 @@
     --header-height: 64px;
     --input-height: 48px;
     --parallax-speed: 0.5;
+    --auth-subtitle: #64748b;
+    --auth-switch: #64748b;
 }
 
 * {
@@ -106,7 +108,7 @@ body::before {
 }
 
 .auth-header p {
-    color: var(--text-light);
+    color: var(--auth-subtitle);
     font-size: 16px;
 }
 
@@ -163,7 +165,7 @@ body::before {
 .auth-switch {
     text-align: center;
     margin-top: 20px;
-    color: var(--tg-text-light);
+    color: var(--auth-switch);
 }
 
 .auth-switch a {
@@ -958,6 +960,8 @@ body.dark-theme {
     --secondary: #1e293b;
     --success: #10b981;
     --error: #ef4444;
+    --auth-subtitle: #94a3b8;
+    --auth-switch: #94a3b8;
 }
 
 body.dark-theme {

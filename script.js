@@ -2,7 +2,7 @@
 
 // Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('Telegram Clone initializing...');
+    console.log('Chat by Fan initializing...');
 
     // All initialization is handled by individual modules
     // auth.js handles authentication
