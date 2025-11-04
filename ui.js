@@ -51,6 +51,9 @@ function showSettingsMenu() {
     const settingsMenu = document.createElement('div');
     settingsMenu.className = 'settings-menu';
     settingsMenu.innerHTML = `
+        <div class="settings-item" id="changeAvatarBtn">
+            <span>📷 Изменить аватарку</span>
+        </div>
         <div class="settings-item" id="themeToggle">
             <span>🌙 Темная тема</span>
             <label class="switch">
@@ -89,6 +92,7 @@ function showSettingsMenu() {
 
 // Setup Settings Menu
 function setupSettingsMenu(menu) {
+    const changeAvatarBtn = menu.querySelector('#changeAvatarBtn');
     const themeToggle = menu.querySelector('#themeToggle');
     const themeSwitch = menu.querySelector('#themeSwitch');
     const logoutBtn = menu.querySelector('#logoutBtn');
@@ -102,6 +106,21 @@ function setupSettingsMenu(menu) {
         if (e.target === themeSwitch) return; // Don't toggle twice
         themeSwitch.checked = !themeSwitch.checked;
         toggleTheme();
+    });
+
+    // Change Avatar
+    changeAvatarBtn.addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                uploadAvatar(file);
+            }
+        };
+        input.click();
+        menu.remove();
     });
 
     themeSwitch.addEventListener('change', toggleTheme);
@@ -241,6 +260,44 @@ function initUI() {
     initSettings();
     initMobile();
     loadSavedTheme();
+}
+
+// Upload Avatar
+async function uploadAvatar(file) {
+    if (!window.currentUser()) return;
+
+    // Validate file
+    if (!file.type.startsWith('image/')) {
+        alert('Пожалуйста, выберите изображение');
+        return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        alert('Файл слишком большой. Максимальный размер: 5MB');
+        return;
+    }
+
+    try {
+        showNotification('Загрузка аватарки...', 'info');
+
+        // Create storage reference
+        const storageRef = window.storageRef(window.storage, `avatars/${window.currentUser().uid}`);
+        const uploadTask = window.uploadBytes(storageRef, file);
+
+        // Wait for upload
+        const snapshot = await uploadTask;
+        const downloadURL = await window.getDownloadURL(snapshot.ref);
+
+        // Update user profile in database
+        await window.update(window.dbRef(window.database, `users/${window.currentUser().uid}`), {
+            avatar: downloadURL
+        });
+
+        showNotification('Аватарка обновлена!', 'success');
+    } catch (error) {
+        console.error('Error uploading avatar:', error);
+        showNotification('Ошибка загрузки аватарки', 'error');
+    }
 }
 
 // Export functions

@@ -119,6 +119,11 @@ function createChatItem(chatId, chatData) {
     const otherParticipantId = chatData.participants.find(id => id !== window.currentUser().uid);
     const otherParticipant = users.get(otherParticipantId);
 
+    // Listen for avatar changes
+    if (otherParticipantId && !users.has(otherParticipantId)) {
+        loadUserInfo(otherParticipantId);
+    }
+
     chatItem.innerHTML = `
         <div class="chat-avatar">
             <img src="${otherParticipant?.avatar || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%23666666"/><text x="50" y="65" text-anchor="middle" fill="white" font-size="40">👤</text></svg>'}" alt="Avatar">
@@ -198,13 +203,17 @@ function createMessageElement(messageId, messageData) {
     const sender = users.get(messageData.sender);
     const time = formatTime(messageData.timestamp);
 
+    const avatarSrc = isOwn ?
+        (window.currentUser()?.photoURL || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%23666666"/><text x="50" y="65" text-anchor="middle" fill="white" font-size="40">👤</text></svg>') :
+        (sender?.avatar || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%23666666"/><text x="50" y="65" text-anchor="middle" fill="white" font-size="40">👤</text></svg>');
+
     messageDiv.innerHTML = `
-        ${!isOwn ? `<div class="message-avatar"><img src="${sender?.avatar || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%23666666"/><text x="50" y="65" text-anchor="middle" fill="white" font-size="40">👤</text></svg>'}" alt="Avatar"></div>` : ''}
+        ${!isOwn ? `<div class="message-avatar"><img src="${avatarSrc}" alt="Avatar"></div>` : ''}
         <div class="message-content">
             <div class="message-bubble">${messageData.text}</div>
             <div class="message-time">${time}</div>
         </div>
-        ${isOwn ? `<div class="message-avatar"><img src="${window.currentUser().photoURL || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%23666666"/><text x="50" y="65" text-anchor="middle" fill="white" font-size="40">👤</text></svg>'}" alt="Avatar"></div>` : ''}
+        ${isOwn ? `<div class="message-avatar"><img src="${avatarSrc}" alt="Avatar"></div>` : ''}
     `;
 
     return messageDiv;
@@ -325,6 +334,12 @@ function loadUserInfo(userId) {
         const userData = snapshot.val();
         if (userData) {
             users.set(userId, userData);
+            // Trigger re-render of chats and messages when user data changes
+            renderChatsList();
+            if (currentChat) {
+                renderMessages(currentChat.id);
+                updateChatUI();
+            }
         }
     });
 }
@@ -349,6 +364,17 @@ function updateChatUI() {
     chatName.textContent = otherParticipant?.displayName || otherParticipant?.username || 'Неизвестный';
     chatStatus.textContent = otherParticipant?.online ? 'онлайн' : 'был(а) недавно';
     chatAvatar.src = otherParticipant?.avatar || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%23666666"/><text x="50" y="65" text-anchor="middle" fill="white" font-size="40">👤</text></svg>';
+
+    // Listen for avatar changes in chat header
+    if (otherParticipantId) {
+        const userRef = window.dbRef(window.database, `users/${otherParticipantId}`);
+        window.onValue(userRef, (snapshot) => {
+            const userData = snapshot.val();
+            if (userData && userData.avatar) {
+                chatAvatar.src = userData.avatar;
+            }
+        });
+    }
 }
 
 // Setup Event Listeners
