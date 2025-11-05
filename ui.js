@@ -196,33 +196,33 @@ function switchTab(tabName) {
 
 // Setup Avatar Selection
 function setupAvatarSelection() {
-    // Remove existing event listeners
-    const existingEmojiBtns = document.querySelectorAll('.emoji-btn');
-    existingEmojiBtns.forEach(btn => {
-        btn.replaceWith(btn.cloneNode(true));
-    });
+    // Use event delegation for emoji buttons
+    const avatarTab = document.getElementById('avatarTab');
+    if (avatarTab) {
+        // Remove existing listeners first
+        const newAvatarTab = avatarTab.cloneNode(true);
+        avatarTab.parentNode.replaceChild(newAvatarTab, avatarTab);
 
-    const existingUploadBtn = document.getElementById('uploadAvatarBtn');
-    if (existingUploadBtn) {
-        existingUploadBtn.replaceWith(existingUploadBtn.cloneNode(true));
+        // Add fresh listener
+        newAvatarTab.addEventListener('click', async (e) => {
+            if (e.target.classList.contains('emoji-btn')) {
+                e.preventDefault();
+                e.stopPropagation();
+                const emoji = e.target.dataset.emoji;
+                console.log('Emoji clicked:', emoji);
+                await setEmojiAvatar(emoji);
+            }
+        });
     }
 
-    // Emoji buttons
-    const emojiBtns = document.querySelectorAll('.emoji-btn');
-    emojiBtns.forEach(btn => {
-        btn.addEventListener('click', async (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const emoji = btn.dataset.emoji;
-            console.log('Emoji clicked:', emoji);
-            await setEmojiAvatar(emoji);
-        });
-    });
-
-    // Upload button
+    // Upload button - recreate each time to avoid duplicate listeners
     const uploadBtn = document.getElementById('uploadAvatarBtn');
     if (uploadBtn) {
-        uploadBtn.addEventListener('click', (e) => {
+        // Remove existing listeners
+        const newUploadBtn = uploadBtn.cloneNode(true);
+        uploadBtn.parentNode.replaceChild(newUploadBtn, uploadBtn);
+
+        newUploadBtn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
             const input = document.createElement('input');
@@ -241,12 +241,12 @@ function setupAvatarSelection() {
                         showNotification('Ошибка загрузки аватарки', 'error');
                     }
                 }
+                input.remove();
             };
 
             document.body.appendChild(input);
             setTimeout(() => {
                 input.click();
-                input.remove();
             }, 10);
         });
     }
@@ -303,6 +303,12 @@ function setupDisplayName() {
 async function setEmojiAvatar(emoji) {
     if (!window.currentUser()) {
         showNotification('Сначала войдите в аккаунт', 'error');
+        return;
+    }
+
+    // Validate emoji input
+    if (!window.inputValidation.validate(emoji, 'message').valid) {
+        showNotification('Недопустимый аватар', 'error');
         return;
     }
 

@@ -53,87 +53,46 @@ async function loginUser() {
     const username = loginUsername.value.trim().toLowerCase();
     const password = loginPassword.value.trim();
 
-    if (!username || !password) {
-        alert('Пожалуйста, заполните все поля');
+    // Validate input with security module
+    const usernameValidation = window.inputValidation.validate(username, 'username');
+    const passwordValidation = window.inputValidation.validate(password, 'password');
+
+    if (!usernameValidation.valid) {
+        alert(usernameValidation.error);
         return;
     }
+
+    if (!passwordValidation.valid) {
+        alert(passwordValidation.error);
+        return;
+    }
+
+    // Sanitize inputs
+    const sanitizedUsername = window.inputValidation.sanitize(username, 'username');
+    const sanitizedPassword = window.inputValidation.sanitize(password, 'password');
 
     try {
         loginBtn.innerHTML = '<div class="loading"></div>';
         loginBtn.disabled = true;
 
-        // Try to login with the standard email pattern
-        const email = `${username}@chatbyfan.local`;
-        console.log('Attempting login with email:', email);
+        // Use secure authentication
+        const result = await window.authSecurity.secureLogin({
+            username: sanitizedUsername,
+            password: sanitizedPassword
+        });
 
-        const userCredential = await window.signInWithEmailAndPassword(window.auth, email, password);
-        console.log('Login successful for user:', userCredential.user.uid);
-
-        // Force refresh auth state
-        await window.auth.currentUser.reload();
-
-        // User will be handled by onAuthStateChanged
-    } catch (error) {
-        console.error('Login error:', error);
-        console.error('Error code:', error.code);
-        console.error('Error message:', error.message);
-
-        // If login fails, try to create account automatically for demo purposes
-        if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-login-credentials') {
-            console.log('User not found, attempting auto-registration...');
-
-            // Check if username is already taken (case-insensitive)
-            const usernameCheckRef = window.dbRef(window.database, `usernames/${username.toLowerCase()}`);
-            const usernameSnapshot = await window.get(usernameCheckRef);
-    
-            if (usernameSnapshot.exists()) {
-                alert('Этот никнейм уже занят. Пожалуйста, выберите другой.');
-                loginBtn.innerHTML = 'Войти';
-                loginBtn.disabled = false;
-                return;
-            }
-    
-            try {
-                // Create the account automatically
-                const userCredential = await window.createUserWithEmailAndPassword(window.auth, email, password);
-                const user = userCredential.user;
-                console.log('Auto-registration successful for user:', user.uid);
-    
-                // Save user profile to database
-                await window.set(window.dbRef(window.database, `users/${user.uid}`), {
-                    uid: user.uid,
-                    username: username.toLowerCase(),
-                    email: email,
-                    displayName: username,
-                    avatar: null,
-                    createdAt: Date.now(),
-                    lastSeen: Date.now(),
-                    online: true
-                });
-    
-                // Reserve the username (case-insensitive)
-                await window.set(window.dbRef(window.database, `usernames/${username.toLowerCase()}`), { uid: user.uid });
-
-                // Force refresh auth state
-                await window.auth.currentUser.reload();
-
-                // User will be handled by onAuthStateChanged
-                return;
-            } catch (regError) {
-                console.error('Auto-registration failed:', regError);
-                // If auto-registration fails, show registration form
-                alert('Аккаунт не найден. Переходим к регистрации...');
-                loginForm.style.display = 'none';
-                registerForm.style.display = 'block';
-                registerUsername.value = username;
-                registerPassword.value = password;
-                return;
-            }
-        } else {
-            const errorMessage = getAuthErrorMessage(error.code) || 'Неверный никнейм или пароль';
-            alert(errorMessage);
+        if (!result.success) {
+            alert(result.error);
+            loginBtn.innerHTML = 'Войти';
+            loginBtn.disabled = false;
+            return;
         }
 
+        // Success - user will be handled by onAuthStateChanged
+
+    } catch (error) {
+        console.error('Login error:', error);
+        alert('Произошла ошибка при входе. Попробуйте еще раз.');
         loginBtn.innerHTML = 'Войти';
         loginBtn.disabled = false;
     }
@@ -144,80 +103,46 @@ async function registerUser() {
     const username = registerUsername.value.trim();
     const password = registerPassword.value.trim();
 
-    if (!username || !password) {
-        alert('Пожалуйста, заполните все поля');
+    // Validate inputs with security module
+    const usernameValidation = window.inputValidation.validate(username, 'username');
+    const passwordValidation = window.inputValidation.validate(password, 'password');
+
+    if (!usernameValidation.valid) {
+        alert(usernameValidation.error);
         return;
     }
 
-    if (username.length < 3) {
-        alert('Никнейм должен содержать минимум 3 символа');
+    if (!passwordValidation.valid) {
+        alert(passwordValidation.error);
         return;
     }
 
-    // Check for Russian characters
-    const russianRegex = /[а-яё]/i;
-    if (russianRegex.test(username)) {
-        alert('Никнейм не может содержать русские буквы');
-        return;
-    }
-
-    // Check for only English letters, numbers and underscores
-    const validUsernameRegex = /^[a-zA-Z0-9_]+$/;
-    if (!validUsernameRegex.test(username)) {
-        alert('Никнейм может содержать только английские буквы, цифры и нижнее подчеркивание');
-        return;
-    }
-
-    if (password.length < 6) {
-        alert('Пароль должен содержать минимум 6 символов');
-        return;
-    }
+    // Sanitize inputs
+    const sanitizedUsername = window.inputValidation.sanitize(username, 'username');
+    const sanitizedPassword = window.inputValidation.sanitize(password, 'password');
 
     try {
         registerBtn.innerHTML = '<div class="loading"></div>';
         registerBtn.disabled = true;
 
-        // Check if username is already taken (case-insensitive)
-        const usernameCheckRef = window.dbRef(window.database, `usernames/${username.toLowerCase()}`);
-        const usernameSnapshot = await window.get(usernameCheckRef);
+        // Use secure registration
+        const result = await window.authSecurity.secureRegister({
+            username: sanitizedUsername,
+            password: sanitizedPassword
+        });
 
-        if (usernameSnapshot.exists()) {
-            alert('Этот никнейм уже занят. Пожалуйста, выберите другой.');
+        if (!result.success) {
+            alert(result.error);
             registerBtn.innerHTML = 'Создать аккаунт';
             registerBtn.disabled = false;
             return;
         }
 
-        // Generate a unique email for Firebase Auth (since we use username for login)
-        const uniqueEmail = `${username.toLowerCase()}@chatbyfan.local`;
-        console.log('Attempting registration with email:', uniqueEmail);
+        // Success - user will be handled by onAuthStateChanged
 
-        // Create user account
-        const userCredential = await window.createUserWithEmailAndPassword(window.auth, uniqueEmail, password);
-        const user = userCredential.user;
-        console.log('Registration successful for user:', user.uid);
-
-        // Save user profile to database
-        await window.set(window.dbRef(window.database, `users/${user.uid}`), {
-            uid: user.uid,
-            username: username.toLowerCase(),
-            email: uniqueEmail,
-            displayName: username,
-            avatar: null,
-            createdAt: Date.now(),
-            lastSeen: Date.now(),
-            online: true
-        });
-
-        // Reserve the username (case-insensitive)
-        await window.set(usernameCheckRef, { uid: user.uid });
-
-        // User will be handled by onAuthStateChanged
     } catch (error) {
         console.error('Registration error:', error);
-        console.error('Error code:', error.code);
-        console.error('Error message:', error.message);
-        alert(error.message || getAuthErrorMessage(error.code));
+        alert('Произошла ошибка при регистрации. Попробуйте еще раз.');
         registerBtn.innerHTML = 'Создать аккаунт';
         registerBtn.disabled = false;
     }

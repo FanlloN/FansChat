@@ -425,8 +425,15 @@ async function sendMessage() {
     const text = messageInput.value.trim();
     if (!text || !currentChat) return;
 
+    // Validate message with security
+    const validation = window.inputValidation.validateAndSanitize(text, 'message');
+    if (!validation.valid) {
+        showNotification(validation.error, 'error');
+        return;
+    }
+
     const messageData = {
-        text: text,
+        text: validation.sanitized,
         sender: window.currentUser().uid,
         timestamp: Date.now(),
         status: 'sent'
@@ -933,9 +940,10 @@ async function handlePaste(event) {
 async function sendImageMessage(file) {
     if (!currentChat || !file.type.startsWith('image/')) return;
 
-    // Validate file size (max 10MB for images)
-    if (file.size > 10 * 1024 * 1024) {
-        showNotification('Файл слишком большой. Максимальный размер: 10MB', 'error');
+    // Validate file with security module
+    const fileValidation = window.inputValidation.validate(file, 'file');
+    if (!fileValidation.valid) {
+        showNotification(fileValidation.error, 'error');
         return;
     }
 
