@@ -1,6 +1,4 @@
-// Auth Module - Handles user authentication
-
-// Current user state
+// Authentication Module
 let currentUser = null;
 
 // DOM Elements
@@ -8,299 +6,33 @@ const authScreen = document.getElementById('authScreen');
 const app = document.getElementById('app');
 const loginForm = document.getElementById('loginForm');
 const registerForm = document.getElementById('registerForm');
-const loginBtn = document.getElementById('loginBtn');
-const registerBtn = document.getElementById('registerBtn');
-const showRegister = document.getElementById('showRegister');
-const showLogin = document.getElementById('showLogin');
 const loginUsername = document.getElementById('loginUsername');
 const loginPassword = document.getElementById('loginPassword');
 const registerUsername = document.getElementById('registerUsername');
 const registerPassword = document.getElementById('registerPassword');
+const loginBtn = document.getElementById('loginBtn');
+const registerBtn = document.getElementById('registerBtn');
+const showRegister = document.getElementById('showRegister');
+const showLogin = document.getElementById('showLogin');
+const userDisplayName = document.getElementById('userDisplayName');
+const userAvatar = document.getElementById('userAvatar');
 
 // Initialize Auth
 function initAuth() {
-    console.log('=== INIT AUTH START ===');
-
-    // Check if Firebase is loaded
-    if (!window.auth || !window.database) {
-        console.error('❌ Firebase not loaded! Check your internet connection and Firebase configuration.');
-        if (window.showNotification) {
-            window.showNotification('Ошибка загрузки Firebase. Проверьте подключение к интернету.', 'error');
-        }
-        return;
-    }
-
-    console.log('✅ Firebase is available');
+    console.log('Initializing Firebase Auth...');
 
     // Check if user is already logged in
     window.onAuthStateChanged(window.auth, (user) => {
-        console.log('🔄 Auth state changed:', user ? 'logged in' : 'logged out');
+        console.log('Auth state changed:', user ? `User ${user.uid} logged in` : 'No user logged in');
+
         if (user) {
             currentUser = user;
-            console.log('👤 User logged in:', user.uid);
             showApp();
-            // Initialize chat after auth
-            if (typeof window.initChat === 'function') {
-                console.log('🎯 Initializing chat...');
-                window.initChat();
-            } else {
-                console.error('❌ initChat function not found');
-            }
+            loadUserProfile();
         } else {
-            currentUser = null;
-            console.log('🚪 User logged out');
             showAuth();
         }
     });
-
-    console.log('🎧 Setting up event listeners...');
-    setupEventListeners();
-    console.log('✅ Auth initialization complete');
-}
-
-// Setup Event Listeners
-function setupEventListeners() {
-    console.log('🎧 Setting up auth event listeners...');
-
-    // Get elements again (in case they weren't available before)
-    const loginBtn = document.getElementById('loginBtn');
-    const registerBtn = document.getElementById('registerBtn');
-    const showRegister = document.getElementById('showRegister');
-    const showLogin = document.getElementById('showLogin');
-    const loginUsername = document.getElementById('loginUsername');
-    const loginPassword = document.getElementById('loginPassword');
-    const registerUsername = document.getElementById('registerUsername');
-    const registerPassword = document.getElementById('registerPassword');
-
-    // Check if elements exist
-    console.log('🔍 Elements check:', {
-        loginBtn: !!loginBtn,
-        registerBtn: !!registerBtn,
-        showRegister: !!showRegister,
-        showLogin: !!showLogin,
-        loginUsername: !!loginUsername,
-        loginPassword: !!loginPassword,
-        registerUsername: !!registerUsername,
-        registerPassword: !!registerPassword
-    });
-
-    if (loginBtn) {
-        loginBtn.addEventListener('click', (e) => {
-            console.log('🔵 Login button clicked');
-            e.preventDefault();
-            handleLogin();
-        });
-        console.log('✅ Login button listener added');
-    } else {
-        console.error('❌ loginBtn not found!');
-    }
-
-    if (registerBtn) {
-        registerBtn.addEventListener('click', (e) => {
-            console.log('🟢 Register button clicked');
-            e.preventDefault();
-            handleRegister();
-        });
-        console.log('✅ Register button listener added');
-    } else {
-        console.error('❌ registerBtn not found!');
-    }
-
-    if (showRegister) {
-        showRegister.addEventListener('click', (e) => {
-            e.preventDefault();
-            console.log('🔄 Show register form clicked');
-            showRegisterForm();
-        });
-        console.log('✅ Show register listener added');
-    } else {
-        console.error('❌ showRegister not found!');
-    }
-
-    if (showLogin) {
-        showLogin.addEventListener('click', (e) => {
-            e.preventDefault();
-            console.log('🔄 Show login form clicked');
-            showLoginForm();
-        });
-        console.log('✅ Show login listener added');
-    } else {
-        console.error('❌ showLogin not found!');
-    }
-
-    // Enter key handlers
-    if (loginUsername) {
-        loginUsername.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                console.log('⌨️ Enter pressed on username');
-                if (loginPassword) loginPassword.focus();
-            }
-        });
-    }
-
-    if (loginPassword) {
-        loginPassword.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                console.log('⌨️ Enter pressed on login password');
-                handleLogin();
-            }
-        });
-    }
-
-    if (registerUsername) {
-        registerUsername.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                console.log('⌨️ Enter pressed on register username');
-                if (registerPassword) registerPassword.focus();
-            }
-        });
-    }
-
-    if (registerPassword) {
-        registerPassword.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                console.log('⌨️ Enter pressed on register password');
-                handleRegister();
-            }
-        });
-    }
-
-    console.log('✅ Auth event listeners setup complete');
-}
-
-// Handle Login
-async function handleLogin() {
-    const username = loginUsername.value.trim();
-    const password = loginPassword.value.trim();
-
-    if (!username || !password) {
-        showNotification('Заполните все поля', 'error');
-        return;
-    }
-
-    try {
-        loginBtn.disabled = true;
-        loginBtn.textContent = 'Вход...';
-
-        // Create email from username for Firebase Auth
-        const email = `${username}@chatbyfan.local`;
-
-        await window.signInWithEmailAndPassword(window.auth, email, password);
-
-        showNotification('Вход выполнен успешно', 'success');
-
-    } catch (error) {
-        console.error('Login error:', error);
-        let message = 'Ошибка входа';
-
-        switch (error.code) {
-            case 'auth/user-not-found':
-                message = 'Пользователь не найден';
-                break;
-            case 'auth/wrong-password':
-                message = 'Неверный пароль';
-                break;
-            case 'auth/invalid-email':
-                message = 'Неверный формат имени пользователя';
-                break;
-            case 'auth/user-disabled':
-                message = 'Аккаунт заблокирован';
-                break;
-        }
-
-        showNotification(message, 'error');
-    } finally {
-        loginBtn.disabled = false;
-        loginBtn.textContent = 'Войти';
-    }
-}
-
-// Handle Register
-async function handleRegister() {
-    const username = registerUsername.value.trim();
-    const password = registerPassword.value.trim();
-
-    if (!username || !password) {
-        showNotification('Заполните все поля', 'error');
-        return;
-    }
-
-    if (username.length < 3) {
-        showNotification('Имя пользователя должно содержать минимум 3 символа', 'error');
-        return;
-    }
-
-    if (password.length < 6) {
-        showNotification('Пароль должен содержать минимум 6 символов', 'error');
-        return;
-    }
-
-    try {
-        registerBtn.disabled = true;
-        registerBtn.textContent = 'Регистрация...';
-
-        // Create email from username for Firebase Auth
-        const email = `${username}@chatbyfan.local`;
-
-        // Create user account
-        const userCredential = await window.createUserWithEmailAndPassword(window.auth, email, password);
-        const user = userCredential.user;
-
-        // Save user profile to database
-        await window.set(window.dbRef(window.database, `users/${user.uid}`), {
-            uid: user.uid,
-            displayName: username,
-            username: username,
-            email: email,
-            createdAt: Date.now(),
-            lastSeen: Date.now(),
-            online: true,
-            avatar: null
-        });
-
-        showNotification('Регистрация выполнена успешно', 'success');
-
-    } catch (error) {
-        console.error('Register error:', error);
-        let message = 'Ошибка регистрации';
-
-        switch (error.code) {
-            case 'auth/email-already-in-use':
-                message = 'Это имя пользователя уже занято';
-                break;
-            case 'auth/weak-password':
-                message = 'Пароль слишком слабый';
-                break;
-            case 'auth/invalid-email':
-                message = 'Неверный формат имени пользователя';
-                break;
-        }
-
-        showNotification(message, 'error');
-    } finally {
-        registerBtn.disabled = false;
-        registerBtn.textContent = 'Создать аккаунт';
-    }
-}
-
-// Handle Logout
-async function handleLogout() {
-    try {
-        // Update user status before logout
-        if (currentUser) {
-            await window.update(window.dbRef(window.database, `users/${currentUser.uid}`), {
-                online: false,
-                lastSeen: Date.now()
-            });
-        }
-
-        await window.signOut(window.auth);
-        showNotification('Выход выполнен', 'success');
-
-    } catch (error) {
-        console.error('Logout error:', error);
-        showNotification('Ошибка выхода', 'error');
-    }
 }
 
 // Show Auth Screen
@@ -309,134 +41,316 @@ function showAuth() {
     app.style.display = 'none';
 }
 
-// Show App
+// Show Main App
 function showApp() {
     authScreen.style.display = 'none';
     app.style.display = 'flex';
+    initChat();
 }
 
-// Show Register Form
-function showRegisterForm() {
-    loginForm.style.display = 'none';
-    registerForm.style.display = 'block';
-    registerUsername.focus();
+// Login User
+async function loginUser() {
+    const username = loginUsername.value.trim().toLowerCase();
+    const password = loginPassword.value.trim();
+
+    if (!username || !password) {
+        alert('Пожалуйста, заполните все поля');
+        return;
+    }
+
+    try {
+        loginBtn.innerHTML = '<div class="loading"></div>';
+        loginBtn.disabled = true;
+
+        // Try to login with the standard email pattern
+        const email = `${username}@chatbyfan.local`;
+        console.log('Attempting login with email:', email);
+
+        const userCredential = await window.signInWithEmailAndPassword(window.auth, email, password);
+        console.log('Login successful for user:', userCredential.user.uid);
+
+        // Force refresh auth state
+        await window.auth.currentUser.reload();
+
+        // User will be handled by onAuthStateChanged
+    } catch (error) {
+        console.error('Login error:', error);
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
+
+        // If login fails, try to create account automatically for demo purposes
+        if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-login-credentials') {
+            console.log('User not found, attempting auto-registration...');
+
+            // Check if username is already taken (case-insensitive)
+            const usernameCheckRef = window.dbRef(window.database, `usernames/${username.toLowerCase()}`);
+            const usernameSnapshot = await window.get(usernameCheckRef);
+    
+            if (usernameSnapshot.exists()) {
+                alert('Этот никнейм уже занят. Пожалуйста, выберите другой.');
+                loginBtn.innerHTML = 'Войти';
+                loginBtn.disabled = false;
+                return;
+            }
+    
+            try {
+                // Create the account automatically
+                const userCredential = await window.createUserWithEmailAndPassword(window.auth, email, password);
+                const user = userCredential.user;
+                console.log('Auto-registration successful for user:', user.uid);
+    
+                // Save user profile to database
+                await window.set(window.dbRef(window.database, `users/${user.uid}`), {
+                    uid: user.uid,
+                    username: username.toLowerCase(),
+                    email: email,
+                    displayName: username,
+                    avatar: null,
+                    createdAt: Date.now(),
+                    lastSeen: Date.now(),
+                    online: true
+                });
+    
+                // Reserve the username (case-insensitive)
+                await window.set(window.dbRef(window.database, `usernames/${username.toLowerCase()}`), { uid: user.uid });
+
+                // Force refresh auth state
+                await window.auth.currentUser.reload();
+
+                // User will be handled by onAuthStateChanged
+                return;
+            } catch (regError) {
+                console.error('Auto-registration failed:', regError);
+                // If auto-registration fails, show registration form
+                alert('Аккаунт не найден. Переходим к регистрации...');
+                loginForm.style.display = 'none';
+                registerForm.style.display = 'block';
+                registerUsername.value = username;
+                registerPassword.value = password;
+                return;
+            }
+        } else {
+            const errorMessage = getAuthErrorMessage(error.code) || 'Неверный никнейм или пароль';
+            alert(errorMessage);
+        }
+
+        loginBtn.innerHTML = 'Войти';
+        loginBtn.disabled = false;
+    }
 }
 
-// Show Login Form
-function showLoginForm() {
-    registerForm.style.display = 'none';
-    loginForm.style.display = 'block';
-    loginUsername.focus();
+// Register User
+async function registerUser() {
+    const username = registerUsername.value.trim();
+    const password = registerPassword.value.trim();
+
+    if (!username || !password) {
+        alert('Пожалуйста, заполните все поля');
+        return;
+    }
+
+    if (username.length < 3) {
+        alert('Никнейм должен содержать минимум 3 символа');
+        return;
+    }
+
+    // Check for Russian characters
+    const russianRegex = /[а-яё]/i;
+    if (russianRegex.test(username)) {
+        alert('Никнейм не может содержать русские буквы');
+        return;
+    }
+
+    // Check for only English letters, numbers and underscores
+    const validUsernameRegex = /^[a-zA-Z0-9_]+$/;
+    if (!validUsernameRegex.test(username)) {
+        alert('Никнейм может содержать только английские буквы, цифры и нижнее подчеркивание');
+        return;
+    }
+
+    if (password.length < 6) {
+        alert('Пароль должен содержать минимум 6 символов');
+        return;
+    }
+
+    try {
+        registerBtn.innerHTML = '<div class="loading"></div>';
+        registerBtn.disabled = true;
+
+        // Check if username is already taken (case-insensitive)
+        const usernameCheckRef = window.dbRef(window.database, `usernames/${username.toLowerCase()}`);
+        const usernameSnapshot = await window.get(usernameCheckRef);
+
+        if (usernameSnapshot.exists()) {
+            alert('Этот никнейм уже занят. Пожалуйста, выберите другой.');
+            registerBtn.innerHTML = 'Создать аккаунт';
+            registerBtn.disabled = false;
+            return;
+        }
+
+        // Generate a unique email for Firebase Auth (since we use username for login)
+        const uniqueEmail = `${username.toLowerCase()}@chatbyfan.local`;
+        console.log('Attempting registration with email:', uniqueEmail);
+
+        // Create user account
+        const userCredential = await window.createUserWithEmailAndPassword(window.auth, uniqueEmail, password);
+        const user = userCredential.user;
+        console.log('Registration successful for user:', user.uid);
+
+        // Save user profile to database
+        await window.set(window.dbRef(window.database, `users/${user.uid}`), {
+            uid: user.uid,
+            username: username.toLowerCase(),
+            email: uniqueEmail,
+            displayName: username,
+            avatar: null,
+            createdAt: Date.now(),
+            lastSeen: Date.now(),
+            online: true
+        });
+
+        // Reserve the username (case-insensitive)
+        await window.set(usernameCheckRef, { uid: user.uid });
+
+        // User will be handled by onAuthStateChanged
+    } catch (error) {
+        console.error('Registration error:', error);
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
+        alert(error.message || getAuthErrorMessage(error.code));
+        registerBtn.innerHTML = 'Создать аккаунт';
+        registerBtn.disabled = false;
+    }
 }
 
-// Get Current User
-function getCurrentUser() {
-    return currentUser;
+// Logout User
+async function logoutUser() {
+    try {
+        // Update online status
+        if (currentUser) {
+            await window.update(window.dbRef(window.database, `users/${currentUser.uid}`), {
+                online: false,
+                lastSeen: Date.now()
+            });
+        }
+
+        await window.signOut(window.auth);
+        currentUser = null;
+        // Force show auth screen immediately
+        showAuth();
+    } catch (error) {
+        console.error('Logout error:', error);
+        alert('Ошибка при выходе из аккаунта');
+    }
 }
 
-// Update User Status
-async function updateUserStatus(online) {
+// Load User Profile
+async function loadUserProfile() {
     if (!currentUser) return;
 
     try {
-        await window.update(window.dbRef(window.database, `users/${currentUser.uid}`), {
-            online: online,
-            lastSeen: online ? null : Date.now()
+        const userRef = window.dbRef(window.database, `users/${currentUser.uid}`);
+        window.onValue(userRef, (snapshot) => {
+            const userData = snapshot.val();
+            if (userData) {
+                userDisplayName.textContent = userData.displayName || userData.username;
+                if (userData.avatar) {
+                    userAvatar.src = userData.avatar;
+                } else {
+                    userAvatar.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjUwIiBmaWxsPSIjNjY2NjY2Ii8+Cjx0ZXh0IHg9IjUwIiB5PSI2NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtc2l6ZT0iNDAiPkDwn5iKPC90ZXh0Pgo8L3N2Zz4=';
+                }
+            }
         });
     } catch (error) {
-        console.error('Error updating user status:', error);
+        console.error('Error loading user profile:', error);
     }
 }
 
-// Show Notification
-function showNotification(message, type = 'info') {
-    // Remove existing notifications
-    const existingNotifications = document.querySelectorAll('.notification');
-    existingNotifications.forEach(notification => notification.remove());
+// Update User Online Status
+function updateOnlineStatus(online) {
+    if (!currentUser) return;
 
-    // Create notification element
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    notification.textContent = message;
-
-    // Style notification
-    Object.assign(notification.style, {
-        position: 'fixed',
-        top: '20px',
-        right: '20px',
-        padding: '15px 20px',
-        borderRadius: '10px',
-        color: 'white',
-        fontWeight: '500',
-        zIndex: '9999',
-        maxWidth: '300px',
-        wordWrap: 'break-word',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-        animation: 'slideIn 0.3s ease-out'
+    window.update(window.dbRef(window.database, `users/${currentUser.uid}`), {
+        online: online,
+        lastSeen: online ? null : Date.now()
+    }).catch(error => {
+        console.error('Error updating online status:', error);
     });
-
-    // Set background color based on type
-    switch (type) {
-        case 'success':
-            notification.style.backgroundColor = '#4caf50';
-            break;
-        case 'error':
-            notification.style.backgroundColor = '#f44336';
-            break;
-        case 'warning':
-            notification.style.backgroundColor = '#ff9800';
-            break;
-        default:
-            notification.style.backgroundColor = '#2196f3';
-    }
-
-    // Add animation
-    const style = document.createElement('style');
-    style.textContent = `
-        @keyframes slideIn {
-            from {
-                transform: translateX(100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
-        }
-    `;
-    document.head.appendChild(style);
-
-    // Add to page
-    document.body.appendChild(notification);
-
-    // Auto remove after 5 seconds
-    setTimeout(() => {
-        notification.style.animation = 'slideOut 0.3s ease-in';
-        setTimeout(() => {
-            if (notification.parentNode) {
-                notification.parentNode.removeChild(notification);
-            }
-        }, 300);
-    }, 5000);
-
-    // Add slideOut animation
-    style.textContent += `
-        @keyframes slideOut {
-            from {
-                transform: translateX(0);
-                opacity: 1;
-            }
-            to {
-                transform: translateX(100%);
-                opacity: 0;
-            }
-        }
-    `;
 }
 
-// Export functions
-window.initAuth = initAuth;
-window.getCurrentUser = getCurrentUser;
-window.handleLogout = handleLogout;
-window.updateUserStatus = updateUserStatus;
-window.showNotification = showNotification;
+// Get Auth Error Message
+function getAuthErrorMessage(errorCode) {
+    switch (errorCode) {
+        case 'auth/invalid-email':
+            return 'Неверный формат email';
+        case 'auth/user-disabled':
+            return 'Аккаунт заблокирован';
+        case 'auth/user-not-found':
+            return 'Пользователь с таким никнеймом не найден';
+        case 'auth/wrong-password':
+            return 'Неверный пароль';
+        case 'auth/invalid-login-credentials':
+            return 'Неверный никнейм или пароль';
+        case 'auth/email-already-in-use':
+            return 'Email уже используется';
+        case 'auth/weak-password':
+            return 'Пароль должен содержать минимум 6 символов';
+        case 'auth/operation-not-allowed':
+            return 'Регистрация временно недоступна';
+        case 'auth/network-request-failed':
+            return 'Ошибка сети. Проверьте подключение к интернету';
+        case 'auth/too-many-requests':
+            return 'Слишком много попыток. Попробуйте позже';
+        default:
+            return 'Произошла ошибка. Попробуйте еще раз.';
+    }
+}
+
+// Event Listeners
+loginBtn.addEventListener('click', loginUser);
+registerBtn.addEventListener('click', registerUser);
+
+loginUsername.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') loginUser();
+});
+
+loginPassword.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') loginUser();
+});
+
+registerUsername.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') registerUser();
+});
+
+registerPassword.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') registerUser();
+});
+
+showRegister.addEventListener('click', (e) => {
+    e.preventDefault();
+    loginForm.style.display = 'none';
+    registerForm.style.display = 'block';
+});
+
+showLogin.addEventListener('click', (e) => {
+    e.preventDefault();
+    registerForm.style.display = 'none';
+    loginForm.style.display = 'block';
+});
+
+// Update online status when page visibility changes
+document.addEventListener('visibilitychange', () => {
+    updateOnlineStatus(!document.hidden);
+});
+
+// Update online status on page unload
+window.addEventListener('beforeunload', () => {
+    updateOnlineStatus(false);
+});
+
+// Initialize auth when DOM is loaded
+document.addEventListener('DOMContentLoaded', initAuth);
+
+// Export functions for use in other modules
+window.logoutUser = logoutUser;
+window.currentUser = () => currentUser;
