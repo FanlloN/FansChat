@@ -3,6 +3,7 @@ let currentChat = null;
 let chats = new Map();
 let messages = new Map();
 let users = new Map();
+let replyToMessageId = null;
 
 // DOM Elements
 const chatsList = document.getElementById('chatsList');
@@ -198,6 +199,14 @@ function loadMessages(chatId) {
     window.onValue(messagesRef, (snapshot) => {
         const messagesData = snapshot.val() || {};
         messages.set(chatId, messagesData);
+
+        // Check for clear chat requests
+        Object.values(messagesData).forEach(message => {
+            if (message.type === 'clear_chat_request' && message.requester !== window.currentUser().uid) {
+                handleClearChatRequest(message);
+            }
+        });
+
         renderMessages(chatId);
         scrollToBottom();
     });
@@ -208,12 +217,118 @@ function renderMessages(chatId) {
     const chatMessages = messages.get(chatId) || {};
     messagesContainer.innerHTML = '';
 
-    Object.entries(chatMessages)
-        .sort((a, b) => a[1].timestamp - b[1].timestamp)
-        .forEach(([messageId, messageData]) => {
-            const messageElement = createMessageElement(messageId, messageData);
+    // Group consecutive images from same sender within 0.5 seconds
+    const groupedMessages = groupMessages(Object.entries(chatMessages)
+        .sort((a, b) => a[1].timestamp - b[1].timestamp));
+
+    groupedMessages.forEach(group => {
+        if (group.length === 1) {
+            // Single message
+            const messageElement = createMessageElement(group[0][0], group[0][1]);
             messagesContainer.appendChild(messageElement);
-        });
+        } else {
+            // Group of images
+            const groupElement = createImageGroupElement(group);
+            messagesContainer.appendChild(groupElement);
+        }
+    });
+}
+
+// Group consecutive images
+function groupMessages(messages) {
+    const groups = [];
+    let currentGroup = [];
+
+    for (let i = 0; i < messages.length; i++) {
+        const [messageId, messageData] = messages[i];
+
+        if (messageData.type === 'image') {
+            currentGroup.push([messageId, messageData]);
+
+            // Check if next message exists and is from same sender within 0.5 seconds
+            if (i + 1 < messages.length) {
+                const nextMessage = messages[i + 1][1];
+                const timeDiff = nextMessage.timestamp - messageData.timestamp;
+
+                if (nextMessage.sender === messageData.sender &&
+                    nextMessage.type === 'image' &&
+                    timeDiff <= 500) { // 0.5 seconds
+                    continue; // Continue grouping
+                }
+            }
+
+            // End of group
+            groups.push([...currentGroup]);
+            currentGroup = [];
+        } else {
+            // Non-image message, add current group if exists
+            if (currentGroup.length > 0) {
+                groups.push([...currentGroup]);
+                currentGroup = [];
+            }
+            groups.push([[messageId, messageData]]);
+        }
+    }
+
+    // Add remaining group
+    if (currentGroup.length > 0) {
+        groups.push(currentGroup);
+    }
+
+    return groups;
+}
+
+// Create Image Group Element
+function createImageGroupElement(messageGroup) {
+    const groupDiv = document.createElement('div');
+    const firstMessage = messageGroup[0][1];
+    const isOwn = firstMessage.sender === window.currentUser().uid;
+
+    groupDiv.className = `message image-group ${isOwn ? 'own' : 'other'}`;
+
+    // Load sender info
+    if (!users.has(firstMessage.sender)) {
+        loadUserInfo(firstMessage.sender);
+    }
+
+    const sender = users.get(firstMessage.sender);
+    const time = formatTime(firstMessage.timestamp);
+
+    const defaultAvatar = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjUwIiBmaWxsPSIjNjY2NjY2Ii8+Cjx0ZXh0IHg9IjUwIiB5PSI3MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtc2l6ZT0iNDAiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiI+👤PC90ZXh0Pgo8L3N2Zz4=';
+
+    const avatarSrc = isOwn ?
+        (users.get(window.currentUser().uid)?.avatar || defaultAvatar) :
+        (sender?.avatar || defaultAvatar);
+
+    const senderName = isOwn ?
+        (users.get(window.currentUser().uid)?.displayName || users.get(window.currentUser().uid)?.username || 'Вы') :
+        (sender?.displayName ? `${sender.displayName} (${sender.username})` : (sender?.username || 'Неизвестный'));
+
+    // Create image grid based on number of images
+    let gridClass = 'image-grid-1';
+    if (messageGroup.length === 2) gridClass = 'image-grid-2';
+    else if (messageGroup.length === 3) gridClass = 'image-grid-3';
+    else if (messageGroup.length >= 4) gridClass = 'image-grid-4';
+
+    const imagesHtml = messageGroup.map(([messageId, messageData]) =>
+        `<img src="${messageData.image}" alt="${messageData.imageName || 'Изображение'}" class="group-image" onclick="openImageModal('${messageData.image}')">`
+    ).join('');
+
+    groupDiv.innerHTML = `
+        ${!isOwn ? `<div class="message-avatar"><img src="${avatarSrc}" alt="Avatar"></div>` : ''}
+        <div class="message-content">
+            ${!isOwn ? `<div class="message-sender">${senderName}</div>` : ''}
+            <div class="message-bubble">
+                <div class="image-group-container ${gridClass}">
+                    ${imagesHtml}
+                </div>
+            </div>
+            <div class="message-time">${time}</div>
+        </div>
+        ${isOwn ? `<div class="message-avatar"><img src="${avatarSrc}" alt="Avatar"></div>` : ''}
+    `;
+
+    return groupDiv;
 }
 
 // Create Message Element
@@ -242,15 +357,36 @@ function createMessageElement(messageId, messageData) {
         (users.get(window.currentUser().uid)?.displayName || users.get(window.currentUser().uid)?.username || 'Вы') :
         (sender?.displayName ? `${sender.displayName} (${sender.username})` : (sender?.username || 'Неизвестный'));
 
-    // Handle image messages
+    // Handle replies
+    let replyHtml = '';
+    if (messageData.replyTo) {
+        const replyMessage = findMessageById(messageData.replyTo);
+        if (replyMessage) {
+            const replySender = users.get(replyMessage.sender);
+            const replySenderName = replySender?.displayName ? `${replySender.displayName} (${replySender.username})` : (replySender?.username || 'Неизвестный');
+            const replyText = replyMessage.type === 'image' ? 'Изображение' : replyMessage.text.substring(0, 50) + (replyMessage.text.length > 50 ? '...' : '');
+            replyHtml = `
+                <div class="message-reply">
+                    <div class="reply-line"></div>
+                    <div class="reply-content">
+                        <div class="reply-sender">${replySenderName}</div>
+                        <div class="reply-text">${replyText}</div>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    // Handle different message types
     let messageContent = '';
     if (messageData.type === 'image' && messageData.image) {
         messageContent = `
             <div class="message-image-container">
                 <img src="${messageData.image}" alt="${messageData.imageName || 'Изображение'}" class="message-image" onclick="openImageModal('${messageData.image}')">
             </div>
-            <div class="message-text">${messageData.text}</div>
         `;
+    } else if (messageData.type === 'clear_chat_request') {
+        messageContent = `<div class="message-text system-message">${messageData.text}</div>`;
     } else {
         messageContent = `<div class="message-text">${messageData.text}</div>`;
     }
@@ -259,13 +395,29 @@ function createMessageElement(messageId, messageData) {
         ${!isOwn ? `<div class="message-avatar"><img src="${avatarSrc}" alt="Avatar"></div>` : ''}
         <div class="message-content">
             ${!isOwn ? `<div class="message-sender">${senderName}</div>` : ''}
-            <div class="message-bubble">${messageContent}</div>
+            <div class="message-bubble" data-message-id="${messageId}">
+                ${replyHtml}
+                ${messageContent}
+                <div class="message-actions">
+                    <button class="reply-btn" onclick="replyToMessage('${messageId}')" title="Ответить">↩️</button>
+                </div>
+            </div>
             <div class="message-time">${time}</div>
         </div>
         ${isOwn ? `<div class="message-avatar"><img src="${avatarSrc}" alt="Avatar"></div>` : ''}
     `;
 
     return messageDiv;
+}
+
+// Find message by ID across all chats
+function findMessageById(messageId) {
+    for (const [chatId, chatMessages] of messages) {
+        if (chatMessages[messageId]) {
+            return chatMessages[messageId];
+        }
+    }
+    return null;
 }
 
 // Send Message
@@ -279,6 +431,12 @@ async function sendMessage() {
         timestamp: Date.now(),
         status: 'sent'
     };
+
+    // Add reply information if replying
+    if (replyToMessageId) {
+        messageData.replyTo = replyToMessageId;
+        cancelReply();
+    }
 
     try {
         const messagesRef = window.dbRef(window.database, `messages/${currentChat.id}`);
@@ -435,6 +593,9 @@ function updateChatUI() {
     chatHeader.style.display = 'flex';
     messageInputContainer.style.display = 'flex';
 
+    // Update reply input container
+    updateReplyInput();
+
     // Private chat header
     const otherParticipantId = currentChat.data.participants.find(id => id !== window.currentUser().uid);
     const otherParticipant = users.get(otherParticipantId);
@@ -459,6 +620,43 @@ function updateChatUI() {
     }
 }
 
+// Update Reply Input Container
+function updateReplyInput() {
+    const container = document.querySelector('.message-input-container');
+    const existingReply = container.querySelector('.reply-input-container');
+
+    if (replyToMessageId) {
+        // Show reply input
+        if (!existingReply) {
+            const replyContainer = document.createElement('div');
+            replyContainer.className = 'reply-input-container';
+
+            const replyMessage = findMessageById(replyToMessageId);
+            if (replyMessage) {
+                const replySender = users.get(replyMessage.sender);
+                const replySenderName = replySender?.displayName ? `${replySender.displayName} (${replySender.username})` : (replySender?.username || 'Неизвестный');
+                const replyText = replyMessage.type === 'image' ? 'Изображение' : replyMessage.text.substring(0, 50) + (replyMessage.text.length > 50 ? '...' : '');
+
+                replyContainer.innerHTML = `
+                    <div class="reply-preview">
+                        <div class="reply-preview-text">
+                            <strong>${replySenderName}:</strong> ${replyText}
+                        </div>
+                        <button class="cancel-reply" onclick="cancelReply()">&times;</button>
+                    </div>
+                `;
+
+                container.insertBefore(replyContainer, container.firstChild);
+            }
+        }
+    } else {
+        // Hide reply input
+        if (existingReply) {
+            existingReply.remove();
+        }
+    }
+}
+
 // Setup Event Listeners
 function setupEventListeners() {
     sendBtn.addEventListener('click', sendMessage);
@@ -477,6 +675,12 @@ function setupEventListeners() {
 
     // Clipboard paste for images
     messageInput.addEventListener('paste', handlePaste);
+
+    // Clear chat functionality
+    const clearChatBtn = document.getElementById('clearChatBtn');
+    if (clearChatBtn) {
+        clearChatBtn.addEventListener('click', requestClearChat);
+    }
 
     newChatBtn.addEventListener('click', () => {
         newChatModal.style.display = 'flex';
@@ -561,6 +765,129 @@ async function deleteChat(chatId) {
     }
 }
 
+// Request Clear Chat
+async function requestClearChat() {
+    if (!currentChat) return;
+
+    const otherParticipantId = currentChat.data.participants.find(id => id !== window.currentUser().uid);
+    if (!otherParticipantId) {
+        showNotification('Невозможно очистить этот чат', 'error');
+        return;
+    }
+
+    if (!confirm('Отправить запрос на очистку чата другому участнику?')) {
+        return;
+    }
+
+    try {
+        // Create clear chat request
+        const requestId = Date.now().toString();
+        const clearRequest = {
+            id: requestId,
+            requester: window.currentUser().uid,
+            chatId: currentChat.id,
+            timestamp: Date.now(),
+            type: 'clear_chat_request'
+        };
+
+        // Send request to both participants
+        await window.set(window.dbRef(window.database, `clearRequests/${currentChat.id}/${requestId}`), clearRequest);
+
+        // Send notification message
+        const notificationMessage = {
+            text: '📝 Запрос на очистку чата отправлен',
+            sender: window.currentUser().uid,
+            timestamp: Date.now(),
+            status: 'sent',
+            type: 'system'
+        };
+
+        const messagesRef = window.dbRef(window.database, `messages/${currentChat.id}`);
+        const newMessageRef = window.push(messagesRef);
+        await window.set(newMessageRef, notificationMessage);
+
+        showNotification('Запрос на очистку чата отправлен', 'info');
+
+        // Listen for responses
+        listenForClearResponses(currentChat.id);
+
+    } catch (error) {
+        console.error('Error requesting clear chat:', error);
+        showNotification('Ошибка отправки запроса', 'error');
+    }
+}
+
+// Listen for Clear Chat Responses
+function listenForClearResponses(chatId) {
+    const responsesRef = window.dbRef(window.database, `clearRequests/${chatId}`);
+    window.onValue(responsesRef, (snapshot) => {
+        const requests = snapshot.val() || {};
+
+        Object.values(requests).forEach(request => {
+            if (request.status === 'accepted' && request.acceptor !== window.currentUser().uid) {
+                // Clear the chat
+                clearChatMessages(chatId);
+                showNotification('Чат очищен!', 'success');
+            } else if (request.status === 'declined' && request.acceptor !== window.currentUser().uid) {
+                showNotification('Запрос на очистку чата отклонен', 'info');
+            }
+        });
+    });
+}
+
+// Clear Chat Messages
+async function clearChatMessages(chatId) {
+    try {
+        const messagesRef = window.dbRef(window.database, `messages/${chatId}`);
+        const snapshot = await window.get(messagesRef);
+        const messages = snapshot.val() || {};
+
+        // Remove all messages
+        const deletePromises = Object.keys(messages).map(messageId =>
+            window.remove(window.dbRef(window.database, `messages/${chatId}/${messageId}`))
+        );
+
+        await Promise.all(deletePromises);
+
+        // Update chat last message to null
+        await window.update(window.dbRef(window.database, `chats/${chatId}`), {
+            lastMessage: null
+        });
+
+        // Clear local messages
+        messages.delete(chatId);
+
+        // Re-render if current chat
+        if (currentChat && currentChat.id === chatId) {
+            renderMessages(chatId);
+        }
+
+        // Update chat list
+        renderChatsList();
+
+    } catch (error) {
+        console.error('Error clearing chat:', error);
+        showNotification('Ошибка очистки чата', 'error');
+    }
+}
+
+// Handle Clear Chat Request (called when user receives a request)
+function handleClearChatRequest(request) {
+    if (request.requester === window.currentUser().uid) return; // Don't handle own requests
+
+    const accept = confirm(`Пользователь ${users.get(request.requester)?.displayName || users.get(request.requester)?.username || 'Неизвестный'} хочет очистить чат. Принять?`);
+
+    // Update request status
+    const updatedRequest = {
+        ...request,
+        status: accept ? 'accepted' : 'declined',
+        acceptor: window.currentUser().uid,
+        responseTime: Date.now()
+    };
+
+    window.update(window.dbRef(window.database, `clearRequests/${request.chatId}/${request.id}`), updatedRequest);
+}
+
 // Show Attachment Options
 function showAttachmentOptions() {
     const input = document.createElement('input');
@@ -619,7 +946,7 @@ async function sendImageMessage(file) {
         const base64String = await fileToBase64(file);
 
         const messageData = {
-            text: '[Изображение]',
+            text: '',
             image: base64String,
             imageName: file.name,
             sender: window.currentUser().uid,
@@ -696,6 +1023,21 @@ function openImageModal(imageSrc) {
     document.addEventListener('keydown', handleEscape);
 }
 
+// Reply to Message
+function replyToMessage(messageId) {
+    replyToMessageId = messageId;
+    updateReplyInput();
+    messageInput.focus();
+}
+
+// Cancel Reply
+function cancelReply() {
+    replyToMessageId = null;
+    updateReplyInput();
+}
+
 // Export functions
 window.initChat = initChat;
 window.openImageModal = openImageModal;
+window.replyToMessage = replyToMessage;
+window.cancelReply = cancelReply;
