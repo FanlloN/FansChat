@@ -4,6 +4,7 @@ let chats = new Map();
 let messages = new Map();
 let users = new Map();
 let replyToMessageId = null;
+let currentGroupChat = null; // For group chat management
 
 // Basic initialization without security overhead
 (function() {
@@ -87,6 +88,8 @@ function loadChatDetails(chatId) {
             chats.set(chatId, chatData);
             loadLastMessage(chatId);
             renderChatsList();
+            // Update group chat info if needed
+            updateChatItemForGroup(chatId, chatData);
         }
     });
 }
@@ -129,6 +132,8 @@ function renderChatsList() {
     sortedChats.forEach(([chatId, chatData]) => {
         const chatItem = createChatItem(chatId, chatData);
         chatsList.appendChild(chatItem);
+        // Update for group chats
+        updateChatItemForGroup(chatId, chatData);
     });
 }
 
@@ -779,28 +784,47 @@ function updateChatUI() {
     // Update reply input container
     updateReplyInput();
 
-    // Private chat header
-    const otherParticipantId = currentChat.data.participants.find(id => id !== window.currentUser().uid);
-    const otherParticipant = users.get(otherParticipantId);
+    const chatData = currentChat.data;
 
-    const defaultAvatar = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjUwIiBmaWxsPSIjNjY2NjY2Ii8+Cjx0ZXh0IHg9IjUwIiB5PSI2NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtc2l6ZT0iNDAiPkDwn5iKPC90ZXh0Pgo8L3N2Zz4=';
+    if (chatData.type === 'group') {
+        // Group chat header
+        chatHeader.classList.add('group-chat-header');
 
-    chatName.textContent = otherParticipant?.displayName ?
-        `${otherParticipant.displayName} (${otherParticipant.username})` :
-        (otherParticipant?.username || 'Неизвестный');
-    chatStatus.textContent = otherParticipant?.online ? 'онлайн' : 'был(а) недавно';
-    chatStatus.classList.toggle('online', otherParticipant?.online || false);
-    chatAvatar.src = otherParticipant?.avatar || defaultAvatar;
+        const groupName = chatData.name || 'Групповой чат';
+        const membersCount = chatData.participants?.length || 0;
 
-    // Update chat header with real-time avatar changes
-    if (otherParticipantId) {
-        const userRef = window.dbRef(window.database, `users/${otherParticipantId}`);
-        window.onValue(userRef, (snapshot) => {
-            const userData = snapshot.val();
-            if (userData) {
-                chatAvatar.src = userData.avatar || defaultAvatar;
-            }
-        });
+        chatName.textContent = groupName;
+        chatStatus.innerHTML = `
+            <div class="group-members-count">${membersCount} участников</div>
+            <button onclick="openGroupSettings()" style="background: none; border: none; color: var(--primary); cursor: pointer; font-size: 14px;">⚙️ Настройки</button>
+        `;
+        chatAvatar.src = chatData.avatar || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjUwIiBmaWxsPSIjNjY2NjY2Ii8+Cjx0ZXh0IHg9IjUwIiB5PSI3MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtc2l6ZT0iNDAiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiI+👥PC90ZXh0Pgo8L3N2Zz4=';
+    } else {
+        // Private chat header
+        chatHeader.classList.remove('group-chat-header');
+
+        const otherParticipantId = chatData.participants.find(id => id !== window.currentUser().uid);
+        const otherParticipant = users.get(otherParticipantId);
+
+        const defaultAvatar = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjUwIiBmaWxsPSIjNjY2NjY2Ii8+Cjx0ZXh0IHg9IjUwIiB5PSI2NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtc2l6ZT0iNDAiPkDwn5iKPC90ZXh0Pgo8L3N2Zz4=';
+
+        chatName.textContent = otherParticipant?.displayName ?
+            `${otherParticipant.displayName} (${otherParticipant.username})` :
+            (otherParticipant?.username || 'Неизвестный');
+        chatStatus.textContent = otherParticipant?.online ? 'онлайн' : 'был(а) недавно';
+        chatStatus.classList.toggle('online', otherParticipant?.online || false);
+        chatAvatar.src = otherParticipant?.avatar || defaultAvatar;
+
+        // Update chat header with real-time avatar changes
+        if (otherParticipantId) {
+            const userRef = window.dbRef(window.database, `users/${otherParticipantId}`);
+            window.onValue(userRef, (snapshot) => {
+                const userData = snapshot.val();
+                if (userData) {
+                    chatAvatar.src = userData.avatar || defaultAvatar;
+                }
+            });
+        }
     }
 }
 
@@ -868,6 +892,7 @@ function setupEventListeners() {
 
     newChatBtn.addEventListener('click', () => {
         newChatModal.style.display = 'flex';
+        switchToPrivateChat(); // Default to private chat
     });
 
     closeNewChatModal.addEventListener('click', closeModal);
@@ -877,9 +902,27 @@ function setupEventListeners() {
         if (e.key === 'Enter') startNewChat();
     });
 
+    // Group chat event listeners
+    document.getElementById('createPrivateChatBtn').addEventListener('click', switchToPrivateChat);
+    document.getElementById('createGroupChatBtn').addEventListener('click', switchToGroupChat);
+    document.getElementById('addMemberBtn').addEventListener('click', addMemberToGroup);
+    document.getElementById('createGroupBtn').addEventListener('click', createGroupChat);
+
+    // Group settings event listeners
+    document.getElementById('closeGroupSettingsModal').addEventListener('click', closeGroupSettingsModal);
+    document.getElementById('changeGroupAvatarBtn').addEventListener('click', changeGroupAvatar);
+    document.getElementById('saveGroupNameBtn').addEventListener('click', saveGroupName);
+    document.getElementById('addNewMemberBtn').addEventListener('click', addNewMemberToGroup);
+    document.getElementById('leaveGroupBtn').addEventListener('click', leaveGroup);
+    document.getElementById('deleteGroupBtn').addEventListener('click', deleteGroup);
+
     // Close modal when clicking outside
     newChatModal.addEventListener('click', (e) => {
         if (e.target === newChatModal) closeModal();
+    });
+
+    document.getElementById('groupSettingsModal').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('groupSettingsModal')) closeGroupSettingsModal();
     });
 
     // Mobile-specific touch events
@@ -1465,8 +1508,535 @@ function startImageCompressionScheduler() {
     }, 5000); // 5 seconds after startup
 }
 
+// Group Chat Functions
+function switchToPrivateChat() {
+    document.getElementById('createPrivateChatBtn').classList.add('active');
+    document.getElementById('createGroupChatBtn').classList.remove('active');
+    document.getElementById('privateChatForm').style.display = 'block';
+    document.getElementById('groupChatForm').style.display = 'none';
+}
+
+function switchToGroupChat() {
+    document.getElementById('createGroupChatBtn').classList.add('active');
+    document.getElementById('createPrivateChatBtn').classList.remove('active');
+    document.getElementById('privateChatForm').style.display = 'none';
+    document.getElementById('groupChatForm').style.display = 'block';
+    loadAvailableUsers();
+}
+
+async function loadAvailableUsers() {
+    try {
+        const usersRef = window.dbRef(window.database, 'users');
+        const snapshot = await window.get(usersRef);
+        const usersData = snapshot.val() || {};
+
+        const groupMembersList = document.getElementById('groupMembersList');
+        groupMembersList.innerHTML = '';
+
+        // Add current user as first member
+        const currentUser = window.currentUser();
+        if (currentUser) {
+            addMemberToGroupList(currentUser.uid, usersData[currentUser.uid], true);
+        }
+
+        // Load other available users
+        Object.entries(usersData).forEach(([userId, userData]) => {
+            if (userId !== currentUser?.uid) {
+                addMemberToGroupList(userId, userData, false);
+            }
+        });
+    } catch (error) {
+        console.error('Error loading users:', error);
+    }
+}
+
+function addMemberToGroupList(userId, userData, isOwner = false) {
+    const groupMembersList = document.getElementById('groupMembersList');
+    const memberItem = document.createElement('div');
+    memberItem.className = 'group-member-item';
+    memberItem.dataset.userId = userId;
+
+    const defaultAvatar = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjUwIiBmaWxsPSIjNjY2NjY2Ii8+Cjx0ZXh0IHg9IjUwIiB5PSI2NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtc2l6ZT0iNDAiPkDwn5iKPC90ZXh0Pgo8L3N2Zz4=';
+
+    memberItem.innerHTML = `
+        <div class="group-member-info">
+            <div class="group-member-avatar">
+                <img src="${userData?.avatar || defaultAvatar}" alt="Avatar">
+            </div>
+            <div class="group-member-name">${userData?.displayName || userData?.username || 'Неизвестный'}${isOwner ? ' (Вы)' : ''}</div>
+        </div>
+        <button class="remove-member-btn" onclick="removeMemberFromGroup('${userId}')" ${isOwner ? 'disabled' : ''}>&times;</button>
+    `;
+
+    groupMembersList.appendChild(memberItem);
+}
+
+function removeMemberFromGroup(userId) {
+    const memberItem = document.querySelector(`[data-user-id="${userId}"]`);
+    if (memberItem) {
+        memberItem.remove();
+    }
+}
+
+function addMemberToGroup() {
+    const addMemberInput = document.getElementById('addMemberInput');
+    const username = addMemberInput.value.trim();
+    if (!username) return;
+
+    // Check if user already exists in the list
+    const existingMembers = document.querySelectorAll('.group-member-item');
+    for (const member of existingMembers) {
+        const memberName = member.querySelector('.group-member-name').textContent;
+        if (memberName.includes(username) || memberName.includes(`(${username})`)) {
+            showNotification('Пользователь уже добавлен', 'warning');
+            return;
+        }
+    }
+
+    // For now, just add as pending member (will be validated when creating group)
+    const groupMembersList = document.getElementById('groupMembersList');
+    const memberItem = document.createElement('div');
+    memberItem.className = 'group-member-item pending-member';
+    memberItem.dataset.username = username;
+
+    memberItem.innerHTML = `
+        <div class="group-member-info">
+            <div class="group-member-avatar">
+                <div style="width: 100%; height: 100%; background: var(--border); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px;">?</div>
+            </div>
+            <div class="group-member-name">${username} (ожидает)</div>
+        </div>
+        <button class="remove-member-btn" onclick="removePendingMember(this)">&times;</button>
+    `;
+
+    groupMembersList.appendChild(memberItem);
+    addMemberInput.value = '';
+}
+
+function removePendingMember(button) {
+    button.closest('.group-member-item').remove();
+}
+
+async function createGroupChat() {
+    const groupName = document.getElementById('groupNameInput').value.trim();
+    if (!groupName) {
+        showNotification('Введите название группы', 'error');
+        return;
+    }
+
+    const memberItems = document.querySelectorAll('.group-member-item');
+    if (memberItems.length < 2) {
+        showNotification('Группа должна иметь минимум 2 участников', 'error');
+        return;
+    }
+
+    try {
+        showNotification('Создание группы...', 'info');
+
+        const currentUser = window.currentUser();
+        const participants = [];
+        const pendingMembers = [];
+
+        // Collect participants
+        memberItems.forEach(item => {
+            if (item.classList.contains('pending-member')) {
+                pendingMembers.push(item.dataset.username);
+            } else {
+                participants.push(item.dataset.userId);
+            }
+        });
+
+        // Validate pending members exist
+        for (const username of pendingMembers) {
+            const userId = await findUserByUsername(username);
+            if (userId) {
+                participants.push(userId);
+            } else {
+                showNotification(`Пользователь ${username} не найден`, 'error');
+                return;
+            }
+        }
+
+        // Create group chat
+        const groupId = 'group_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        const groupData = {
+            id: groupId,
+            name: groupName,
+            participants: participants,
+            createdAt: Date.now(),
+            createdBy: currentUser.uid,
+            type: 'group',
+            avatar: null
+        };
+
+        // Save group data
+        await window.set(window.dbRef(window.database, `chats/${groupId}`), groupData);
+
+        // Add to each participant's chat list
+        for (const participantId of participants) {
+            await window.set(window.dbRef(window.database, `userChats/${participantId}/${groupId}`), true);
+        }
+
+        // Open the new group chat
+        openChat(groupId);
+        closeModal();
+
+        // Reset form
+        document.getElementById('groupNameInput').value = '';
+        document.getElementById('groupMembersList').innerHTML = '';
+
+        showNotification('Группа создана!', 'success');
+
+    } catch (error) {
+        console.error('Error creating group:', error);
+        showNotification('Ошибка создания группы', 'error');
+    }
+}
+
+async function findUserByUsername(username) {
+    try {
+        const usersRef = window.dbRef(window.database, 'users');
+        const snapshot = await window.get(usersRef);
+        const usersData = snapshot.val() || {};
+
+        for (const [userId, userData] of Object.entries(usersData)) {
+            if (userData.username === username || userData.displayName === username) {
+                return userId;
+            }
+        }
+        return null;
+    } catch (error) {
+        console.error('Error finding user:', error);
+        return null;
+    }
+}
+
+// Group Settings Functions
+function openGroupSettings() {
+    if (!currentChat || !currentChat.data || currentChat.data.type !== 'group') return;
+
+    currentGroupChat = currentChat;
+    loadGroupSettings();
+    document.getElementById('groupSettingsModal').style.display = 'flex';
+}
+
+async function loadGroupSettings() {
+    if (!currentGroupChat) return;
+
+    const groupData = currentGroupChat.data;
+
+    // Load group name
+    document.getElementById('editGroupNameInput').value = groupData.name || '';
+
+    // Load group avatar
+    const avatarImg = document.getElementById('groupAvatarImg');
+    const avatarPlaceholder = document.querySelector('.avatar-placeholder');
+
+    if (groupData.avatar) {
+        avatarImg.src = groupData.avatar;
+        avatarImg.style.display = 'block';
+        avatarPlaceholder.style.display = 'none';
+    } else {
+        avatarImg.style.display = 'none';
+        avatarPlaceholder.style.display = 'flex';
+    }
+
+    // Load members
+    await loadGroupMembers();
+
+    // Show delete button only for group owner
+    const deleteBtn = document.getElementById('deleteGroupBtn');
+    if (groupData.createdBy === window.currentUser().uid) {
+        deleteBtn.style.display = 'block';
+    } else {
+        deleteBtn.style.display = 'none';
+    }
+}
+
+async function loadGroupMembers() {
+    if (!currentGroupChat) return;
+
+    const membersList = document.getElementById('manageGroupMembersList');
+    membersList.innerHTML = '';
+
+    for (const participantId of currentGroupChat.data.participants) {
+        try {
+            const userRef = window.dbRef(window.database, `users/${participantId}`);
+            const snapshot = await window.get(userRef);
+            const userData = snapshot.val();
+
+            if (userData) {
+                const memberItem = document.createElement('div');
+                memberItem.className = 'group-member-item';
+
+                const defaultAvatar = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjUwIiBmaWxsPSIjNjY2NjY2Ii8+Cjx0ZXh0IHg9IjUwIiB5PSI2NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtc2l6ZT0iNDAiPkDwn5iKPC90ZXh0Pgo8L3N2Zz4=';
+
+                const isOwner = participantId === currentGroupChat.data.createdBy;
+                const isCurrentUser = participantId === window.currentUser().uid;
+                const canRemove = !isOwner && currentGroupChat.data.createdBy === window.currentUser().uid && !isCurrentUser;
+
+                memberItem.innerHTML = `
+                    <div class="group-member-info">
+                        <div class="group-member-avatar">
+                            <img src="${userData.avatar || defaultAvatar}" alt="Avatar">
+                        </div>
+                        <div class="group-member-name">${userData.displayName || userData.username || 'Неизвестный'}${isOwner ? ' 👑' : ''}${isCurrentUser ? ' (Вы)' : ''}</div>
+                    </div>
+                    ${canRemove ? `<button class="remove-member-btn" onclick="removeMemberFromGroupSettings('${participantId}')">&times;</button>` : ''}
+                `;
+
+                membersList.appendChild(memberItem);
+            }
+        } catch (error) {
+            console.error('Error loading member:', error);
+        }
+    }
+}
+
+async function saveGroupName() {
+    if (!currentGroupChat) return;
+
+    const newName = document.getElementById('editGroupNameInput').value.trim();
+    if (!newName) {
+        showNotification('Введите название группы', 'error');
+        return;
+    }
+
+    if (currentGroupChat.data.createdBy !== window.currentUser().uid) {
+        showNotification('Только владелец группы может менять название', 'error');
+        return;
+    }
+
+    try {
+        await window.update(window.dbRef(window.database, `chats/${currentGroupChat.id}`), {
+            name: newName
+        });
+
+        currentGroupChat.data.name = newName;
+        updateChatUI();
+
+        showNotification('Название группы сохранено', 'success');
+    } catch (error) {
+        console.error('Error saving group name:', error);
+        showNotification('Ошибка сохранения названия', 'error');
+    }
+}
+
+async function changeGroupAvatar() {
+    if (!currentGroupChat) return;
+
+    if (currentGroupChat.data.createdBy !== window.currentUser().uid) {
+        showNotification('Только владелец группы может менять аватар', 'error');
+        return;
+    }
+
+    const input = document.getElementById('groupAvatarInput');
+    input.click();
+
+    input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+            showNotification('Загрузка аватара...', 'info');
+
+            const base64String = await fileToBase64(file);
+
+            await window.update(window.dbRef(window.database, `chats/${currentGroupChat.id}`), {
+                avatar: base64String
+            });
+
+            currentGroupChat.data.avatar = base64String;
+            updateChatUI();
+            loadGroupSettings();
+
+            showNotification('Аватар группы обновлен', 'success');
+        } catch (error) {
+            console.error('Error changing group avatar:', error);
+            showNotification('Ошибка загрузки аватара', 'error');
+        }
+    };
+}
+
+async function addNewMemberToGroup() {
+    if (!currentGroupChat) return;
+
+    if (currentGroupChat.data.createdBy !== window.currentUser().uid) {
+        showNotification('Только владелец группы может добавлять участников', 'error');
+        return;
+    }
+
+    const addMemberInput = document.getElementById('addNewMemberInput');
+    const username = addMemberInput.value.trim();
+    if (!username) return;
+
+    try {
+        const userId = await findUserByUsername(username);
+        if (!userId) {
+            showNotification('Пользователь не найден', 'error');
+            return;
+        }
+
+        if (currentGroupChat.data.participants.includes(userId)) {
+            showNotification('Пользователь уже в группе', 'warning');
+            return;
+        }
+
+        // Add to participants
+        const newParticipants = [...currentGroupChat.data.participants, userId];
+        await window.update(window.dbRef(window.database, `chats/${currentGroupChat.id}`), {
+            participants: newParticipants
+        });
+
+        // Add to user's chat list
+        await window.set(window.dbRef(window.database, `userChats/${userId}/${currentGroupChat.id}`), true);
+
+        currentGroupChat.data.participants = newParticipants;
+        loadGroupMembers();
+        addMemberInput.value = '';
+
+        showNotification('Участник добавлен', 'success');
+    } catch (error) {
+        console.error('Error adding member:', error);
+        showNotification('Ошибка добавления участника', 'error');
+    }
+}
+
+async function removeMemberFromGroupSettings(userId) {
+    if (!currentGroupChat) return;
+
+    if (currentGroupChat.data.createdBy !== window.currentUser().uid) {
+        showNotification('Только владелец группы может удалять участников', 'error');
+        return;
+    }
+
+    try {
+        // Remove from participants
+        const newParticipants = currentGroupChat.data.participants.filter(id => id !== userId);
+        await window.update(window.dbRef(window.database, `chats/${currentGroupChat.id}`), {
+            participants: newParticipants
+        });
+
+        // Remove from user's chat list
+        await window.remove(window.dbRef(window.database, `userChats/${userId}/${currentGroupChat.id}`));
+
+        currentGroupChat.data.participants = newParticipants;
+        loadGroupMembers();
+
+        showNotification('Участник удален', 'success');
+    } catch (error) {
+        console.error('Error removing member:', error);
+        showNotification('Ошибка удаления участника', 'error');
+    }
+}
+
+async function leaveGroup() {
+    if (!currentGroupChat) return;
+
+    const confirmLeave = confirm('Вы уверены, что хотите покинуть группу?');
+    if (!confirmLeave) return;
+
+    try {
+        const currentUserId = window.currentUser().uid;
+
+        // Remove from participants
+        const newParticipants = currentGroupChat.data.participants.filter(id => id !== currentUserId);
+        await window.update(window.dbRef(window.database, `chats/${currentGroupChat.id}`), {
+            participants: newParticipants
+        });
+
+        // Remove from user's chat list
+        await window.remove(window.dbRef(window.database, `userChats/${currentUserId}/${currentGroupChat.id}`));
+
+        // Close group settings and chat
+        closeGroupSettingsModal();
+        currentChat = null;
+        currentGroupChat = null;
+        updateChatUI();
+
+        showNotification('Вы покинули группу', 'success');
+    } catch (error) {
+        console.error('Error leaving group:', error);
+        showNotification('Ошибка выхода из группы', 'error');
+    }
+}
+
+async function deleteGroup() {
+    if (!currentGroupChat) return;
+
+    if (currentGroupChat.data.createdBy !== window.currentUser().uid) {
+        showNotification('Только владелец группы может её удалить', 'error');
+        return;
+    }
+
+    const confirmDelete = confirm('Вы уверены, что хотите удалить группу? Это действие нельзя отменить.');
+    if (!confirmDelete) return;
+
+    try {
+        // Remove chat from all participants
+        for (const participantId of currentGroupChat.data.participants) {
+            await window.remove(window.dbRef(window.database, `userChats/${participantId}/${currentGroupChat.id}`));
+        }
+
+        // Delete chat data
+        await window.remove(window.dbRef(window.database, `chats/${currentGroupChat.id}`));
+
+        // Delete messages
+        await window.remove(window.dbRef(window.database, `messages/${currentGroupChat.id}`));
+
+        // Close modal and chat
+        closeGroupSettingsModal();
+        currentChat = null;
+        currentGroupChat = null;
+        updateChatUI();
+        renderChatsList();
+
+        showNotification('Группа удалена', 'success');
+    } catch (error) {
+        console.error('Error deleting group:', error);
+        showNotification('Ошибка удаления группы', 'error');
+    }
+}
+
+function closeGroupSettingsModal() {
+    document.getElementById('groupSettingsModal').style.display = 'none';
+    currentGroupChat = null;
+}
+
+// Update chat rendering for groups
+function updateChatItemForGroup(chatId, chatData) {
+    const chatItem = document.querySelector(`[data-chat-id="${chatId}"]`);
+    if (!chatItem) return;
+
+    if (chatData.type === 'group') {
+        chatItem.classList.add('group-chat-item');
+
+        const chatName = chatData.name || 'Групповой чат';
+        const membersCount = chatData.participants?.length || 0;
+
+        chatItem.querySelector('.chat-name').textContent = chatName;
+        chatItem.querySelector('.chat-last-message').innerHTML = `
+            ${chatData.lastMessage ? formatLastMessage(chatData.lastMessage) : 'Нет сообщений'}
+            <div class="group-members-count">${membersCount} участников</div>
+        `;
+    }
+}
+
 // Export functions
 window.initChat = initChat;
 window.openImageModal = openImageModal;
 window.replyToMessage = replyToMessage;
 window.cancelReply = cancelReply;
+window.switchToPrivateChat = switchToPrivateChat;
+window.switchToGroupChat = switchToGroupChat;
+window.addMemberToGroup = addMemberToGroup;
+window.removePendingMember = removePendingMember;
+window.createGroupChat = createGroupChat;
+window.openGroupSettings = openGroupSettings;
+window.saveGroupName = saveGroupName;
+window.changeGroupAvatar = changeGroupAvatar;
+window.addNewMemberToGroup = addNewMemberToGroup;
+window.removeMemberFromGroupSettings = removeMemberFromGroupSettings;
+window.leaveGroup = leaveGroup;
+window.deleteGroup = deleteGroup;
+window.closeGroupSettingsModal = closeGroupSettingsModal;
