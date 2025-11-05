@@ -81,6 +81,18 @@ async function loginUser() {
         // If login fails, try to create account automatically for demo purposes
         if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-login-credentials') {
             console.log('User not found, attempting auto-registration...');
+
+            // Check if username is already taken
+            const usernameCheckRef = window.dbRef(window.database, `usernames/${username}`);
+            const usernameSnapshot = await window.get(usernameCheckRef);
+
+            if (usernameSnapshot.exists()) {
+                alert('Этот никнейм уже занят. Пожалуйста, выберите другой.');
+                loginBtn.innerHTML = 'Войти';
+                loginBtn.disabled = false;
+                return;
+            }
+
             try {
                 // Create the account automatically
                 const userCredential = await window.createUserWithEmailAndPassword(window.auth, email, password);
@@ -149,10 +161,10 @@ async function registerUser() {
         return;
     }
 
-    // Check for only English letters and underscores (no numbers)
-    const validUsernameRegex = /^[a-zA-Z_]+$/;
+    // Check for only English letters, numbers and underscores
+    const validUsernameRegex = /^[a-zA-Z0-9_]+$/;
     if (!validUsernameRegex.test(username)) {
-        alert('Никнейм может содержать только английские буквы и нижнее подчеркивание');
+        alert('Никнейм может содержать только английские буквы, цифры и нижнее подчеркивание');
         return;
     }
 

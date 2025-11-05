@@ -291,12 +291,12 @@ async function startNewChat() {
         const userSnapshot = await window.get(userRef);
         const users = userSnapshot.val();
 
-        // Find user by username
+        // Find user by username (case-insensitive)
         let targetUserId = null;
         let targetUserData = null;
 
         for (const [uid, userData] of Object.entries(users || {})) {
-            if (userData.username === username) {
+            if (userData.username.toLowerCase() === username.toLowerCase()) {
                 targetUserId = uid;
                 targetUserData = userData;
                 break;
