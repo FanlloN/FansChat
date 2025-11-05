@@ -526,3 +526,56 @@ async function deleteChat(chatId) {
 
 // Export functions
 window.initChat = initChat;
+
+// Show notification for new messages
+function showNewMessageNotification(chatId, messageData, senderName) {
+    const notificationsEnabled = localStorage.getItem('notificationsEnabled') === 'true';
+    if (!notificationsEnabled || document.hasFocus()) return;
+
+    if ('Notification' in window && Notification.permission === 'granted') {
+        const notification = new Notification(`Новое сообщение от ${senderName}`, {
+            body: messageData.text,
+            icon: '/favicon.ico',
+            tag: chatId // Prevents duplicate notifications for the same chat
+        });
+
+        notification.onclick = () => {
+            window.focus();
+            openChat(chatId);
+            notification.close();
+        };
+
+        // Auto close after 5 seconds
+        setTimeout(() => notification.close(), 5000);
+    }
+}
+
+// Update message listeners to include notifications
+function loadMessages(chatId) {
+    const messagesRef = window.dbRef(window.database, `messages/${chatId}`);
+
+    window.onValue(messagesRef, (snapshot) => {
+        const messagesData = snapshot.val() || {};
+        const previousMessageCount = messages.get(chatId) ? Object.keys(messages.get(chatId)).length : 0;
+        const newMessageCount = Object.keys(messagesData).length;
+
+        messages.set(chatId, messagesData);
+        renderMessages(chatId);
+        scrollToBottom();
+
+        // Show notification for new messages if chat is not active
+        if (newMessageCount > previousMessageCount && (!currentChat || currentChat.id !== chatId)) {
+            const newMessages = Object.entries(messagesData)
+                .sort((a, b) => b[1].timestamp - a[1].timestamp)
+                .slice(0, newMessageCount - previousMessageCount);
+
+            newMessages.forEach(([messageId, messageData]) => {
+                if (messageData.sender !== window.currentUser().uid) {
+                    const sender = users.get(messageData.sender);
+                    const senderName = sender?.displayName || sender?.username || 'Неизвестный';
+                    showNewMessageNotification(chatId, messageData, senderName);
+                }
+            });
+        }
+    });
+}

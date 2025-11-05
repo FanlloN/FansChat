@@ -10,7 +10,7 @@
     <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, EmailAuthProvider, updatePassword } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
         import { getDatabase, ref, set, onValue, push, update, remove, get, query, orderByChild, limitToLast } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
         import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-storage.js";
 
@@ -49,6 +49,9 @@
         window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
         window.signOut = signOut;
         window.onAuthStateChanged = onAuthStateChanged;
+        window.EmailAuthProvider = EmailAuthProvider;
+        window.updatePassword = updatePassword;
+        window.reauthenticateWithCredential = auth.reauthenticateWithCredential.bind(auth);
         window.dbRef = ref;
         window.set = set;
         window.onValue = onValue;
@@ -106,6 +109,7 @@
                     <div class="user-name" id="userDisplayName">Пользователь</div>
                     <div class="user-status">онлайн</div>
                 </div>
+                <button class="settings-btn" id="settingsBtn">⚙️</button>
             </div>
 
             <!-- Search -->
@@ -187,6 +191,96 @@
             <div class="modal-body">
                 <input type="text" id="newChatUsername" placeholder="Имя пользователя" class="modal-input">
                 <button id="startNewChatBtn" class="modal-btn">Начать чат</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal" id="settingsModal" style="display: none;">
+        <div class="modal-content settings-modal-content">
+            <div class="modal-header">
+                <h3>Настройки</h3>
+                <button class="close-modal" id="closeSettingsModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-tabs">
+                    <div class="tab-buttons">
+                        <button class="tab-btn active" data-tab="theme">Тема</button>
+                        <button class="tab-btn" data-tab="avatar">Аватар</button>
+                        <button class="tab-btn" data-tab="password">Пароль</button>
+                        <button class="tab-btn" data-tab="privacy">Конфиденциальность</button>
+                    </div>
+                    <div class="tab-content">
+                        <!-- Theme Tab -->
+                        <div class="tab-pane active" id="theme-tab">
+                            <h4>Выберите тему</h4>
+                            <div class="theme-options">
+                                <div class="theme-option" data-theme="light">
+                                    <div class="theme-preview light-preview"></div>
+                                    <span>Светлая</span>
+                                </div>
+                                <div class="theme-option" data-theme="dark">
+                                    <div class="theme-preview dark-preview"></div>
+                                    <span>Темная</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Avatar Tab -->
+                        <div class="tab-pane" id="avatar-tab">
+                            <h4>Выберите аватар</h4>
+                            <div class="avatar-options">
+                                <div class="emoji-avatars">
+                                    <button class="emoji-btn" data-emoji="😘">😘</button>
+                                    <button class="emoji-btn" data-emoji="🤑">🤑</button>
+                                    <button class="emoji-btn" data-emoji="🤠">🤠</button>
+                                    <button class="emoji-btn" data-emoji="👽">👽</button>
+                                    <button class="emoji-btn" data-emoji="👻">👻</button>
+                                    <button class="emoji-btn" data-emoji="🐷">🐷</button>
+                                    <button class="emoji-btn" data-emoji="👳‍♂️">👳‍♂️</button>
+                                    <button class="emoji-btn" data-emoji="👩">👩</button>
+                                    <button class="emoji-btn" data-emoji="👨">👨</button>
+                                    <button class="emoji-btn" data-emoji="👳‍♀️">👳‍♀️</button>
+                                    <button class="emoji-btn" data-emoji="🤴">🤴</button>
+                                </div>
+                                <div class="custom-avatar">
+                                    <button id="uploadAvatarBtn" class="modal-btn">Загрузить картинку</button>
+                                    <input type="file" id="avatarFileInput" accept="image/*" style="display: none;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Password Tab -->
+                        <div class="tab-pane" id="password-tab">
+                            <h4>Сменить пароль</h4>
+                            <input type="password" id="oldPassword" placeholder="Старый пароль" class="modal-input">
+                            <input type="password" id="newPassword" placeholder="Новый пароль" class="modal-input">
+                            <input type="password" id="confirmPassword" placeholder="Подтвердите новый пароль" class="modal-input">
+                            <button id="changePasswordBtn" class="modal-btn">Сменить пароль</button>
+                        </div>
+
+                        <!-- Privacy Tab -->
+                        <div class="tab-pane" id="privacy-tab">
+                            <h4>Конфиденциальность</h4>
+                            <div class="privacy-settings">
+                                <div class="setting-item">
+                                    <span>Уведомления</span>
+                                    <label class="switch">
+                                        <input type="checkbox" id="notificationsToggle">
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                                <div class="setting-item">
+                                    <span>Звонки</span>
+                                    <label class="switch">
+                                        <input type="checkbox" id="callsToggle">
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
