@@ -184,10 +184,26 @@ async function loadUserProfile() {
                 } else {
                     userAvatar.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjUwIiBmaWxsPSIjNjY2NjY2Ii8+Cjx0ZXh0IHg9IjUwIiB5PSI2NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtc2l6ZT0iNDAiPkDwn5iKPC90ZXh0Pgo8L3N2Zz4=';
                 }
+                // Update online status styling
+                updateOnlineStatusDisplay(userData.online);
             }
         });
     } catch (error) {
         console.error('Error loading user profile:', error);
+    }
+}
+
+// Update Online Status Display
+function updateOnlineStatusDisplay(isOnline) {
+    const userStatus = document.getElementById('userStatus');
+    if (userStatus) {
+        if (isOnline) {
+            userStatus.textContent = 'онлайн';
+            userStatus.classList.add('online');
+        } else {
+            userStatus.textContent = 'был(а) недавно';
+            userStatus.classList.remove('online');
+        }
     }
 }
 

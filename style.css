@@ -262,6 +262,12 @@ body.dark-theme .user-profile {
 .user-status {
     font-size: 13px;
     color: var(--text-light);
+    transition: color 0.3s ease;
+}
+
+.user-status.online {
+    color: var(--primary);
+    font-weight: 500;
 }
 
 .settings-btn {

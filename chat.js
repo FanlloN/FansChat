@@ -318,9 +318,12 @@ function createImageGroupElement(messageGroup) {
         ${!isOwn ? `<div class="message-avatar"><img src="${avatarSrc}" alt="Avatar"></div>` : ''}
         <div class="message-content">
             ${!isOwn ? `<div class="message-sender">${senderName}</div>` : ''}
-            <div class="message-bubble">
+            <div class="message-bubble" data-message-id="${messageGroup[0][0]}">
                 <div class="image-group-container ${gridClass}">
                     ${imagesHtml}
+                </div>
+                <div class="message-actions">
+                    <button class="reply-btn" onclick="replyToMessage('${messageGroup[0][0]}')" title="Ответить">↩️</button>
                 </div>
             </div>
             <div class="message-time">${time}</div>
@@ -364,7 +367,17 @@ function createMessageElement(messageId, messageData) {
         if (replyMessage) {
             const replySender = users.get(replyMessage.sender);
             const replySenderName = replySender?.displayName ? `${replySender.displayName} (${replySender.username})` : (replySender?.username || 'Неизвестный');
-            const replyText = replyMessage.type === 'image' ? 'Изображение' : replyMessage.text.substring(0, 50) + (replyMessage.text.length > 50 ? '...' : '');
+
+            // Handle different reply types
+            let replyText = '';
+            if (replyMessage.type === 'image') {
+                // Check if it's part of an image group
+                const isImageGroup = isMessagePartOfImageGroup(replyMessage);
+                replyText = isImageGroup ? 'Группа изображений' : 'Изображение';
+            } else {
+                replyText = replyMessage.text.substring(0, 50) + (replyMessage.text.length > 50 ? '...' : '');
+            }
+
             replyHtml = `
                 <div class="message-reply">
                     <div class="reply-line"></div>
@@ -420,6 +433,51 @@ function findMessageById(messageId) {
     return null;
 }
 
+// Check if a message is part of an image group
+function isMessagePartOfImageGroup(message) {
+    if (!currentChat || message.type !== 'image') return false;
+
+    const chatMessages = messages.get(currentChat.id) || {};
+    const messageEntries = Object.entries(chatMessages).sort((a, b) => a[1].timestamp - b[1].timestamp);
+
+    // Find the group this message belongs to
+    for (let i = 0; i < messageEntries.length; i++) {
+        const [msgId, msgData] = messageEntries[i];
+        if (msgId === message.timestamp.toString() || msgId === message.timestamp) {
+            // Check if there are consecutive images around this message
+            let groupSize = 1;
+
+            // Check previous messages
+            for (let j = i - 1; j >= 0; j--) {
+                const prevMsg = messageEntries[j][1];
+                if (prevMsg.sender === message.sender &&
+                    prevMsg.type === 'image' &&
+                    (message.timestamp - prevMsg.timestamp) <= 500) {
+                    groupSize++;
+                } else {
+                    break;
+                }
+            }
+
+            // Check next messages
+            for (let j = i + 1; j < messageEntries.length; j++) {
+                const nextMsg = messageEntries[j][1];
+                if (nextMsg.sender === message.sender &&
+                    nextMsg.type === 'image' &&
+                    (nextMsg.timestamp - message.timestamp) <= 500) {
+                    groupSize++;
+                } else {
+                    break;
+                }
+            }
+
+            return groupSize > 1;
+        }
+    }
+
+    return false;
+}
+
 // Send Message
 async function sendMessage() {
     const text = messageInput.value.trim();
@@ -443,6 +501,14 @@ async function sendMessage() {
     if (replyToMessageId) {
         messageData.replyTo = replyToMessageId;
         cancelReply();
+    }
+
+    // Check for duplicate messages within 0.5 seconds
+    const isDuplicate = await checkForDuplicateMessage(messageData);
+    if (isDuplicate) {
+        showNotification('Сообщение уже отправлено', 'info');
+        messageInput.value = '';
+        return;
     }
 
     try {
@@ -472,6 +538,47 @@ async function sendMessage() {
     } catch (error) {
         console.error('Error sending message:', error);
         alert('Ошибка отправки сообщения');
+    }
+}
+
+// Check for duplicate messages within 0.5 seconds
+async function checkForDuplicateMessage(newMessageData) {
+    if (!currentChat) return false;
+
+    try {
+        const messagesRef = window.dbRef(window.database, `messages/${currentChat.id}`);
+        const snapshot = await window.get(messagesRef);
+        const chatMessages = snapshot.val() || {};
+
+        const currentTime = Date.now();
+        const timeWindow = 500; // 0.5 seconds
+
+        // Find messages from the same sender within the time window
+        const recentMessages = Object.values(chatMessages).filter(msg =>
+            msg.sender === newMessageData.sender &&
+            msg.text === newMessageData.text &&
+            (currentTime - msg.timestamp) <= timeWindow
+        );
+
+        if (recentMessages.length > 0) {
+            // Remove duplicate messages (keep only the most recent one)
+            const messagesToDelete = recentMessages.slice(0, -1); // Keep the last one
+
+            for (const msg of messagesToDelete) {
+                // Find the message key
+                const messageKey = Object.keys(chatMessages).find(key => chatMessages[key] === msg);
+                if (messageKey) {
+                    await window.remove(window.dbRef(window.database, `messages/${currentChat.id}/${messageKey}`));
+                }
+            }
+
+            return true; // This is a duplicate
+        }
+
+        return false; // Not a duplicate
+    } catch (error) {
+        console.error('Error checking for duplicates:', error);
+        return false;
     }
 }
 
@@ -613,6 +720,7 @@ function updateChatUI() {
         `${otherParticipant.displayName} (${otherParticipant.username})` :
         (otherParticipant?.username || 'Неизвестный');
     chatStatus.textContent = otherParticipant?.online ? 'онлайн' : 'был(а) недавно';
+    chatStatus.classList.toggle('online', otherParticipant?.online || false);
     chatAvatar.src = otherParticipant?.avatar || defaultAvatar;
 
     // Update chat header with real-time avatar changes
