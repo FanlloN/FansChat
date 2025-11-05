@@ -337,59 +337,127 @@
         function handleLogin() {
             console.log('🚪 Handling login...');
 
-            // Create visible popup instead of alert
-            const popup = document.createElement('div');
-            popup.style.cssText = `
-                position: fixed;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                background: white;
-                border: 2px solid green;
-                padding: 20px;
-                border-radius: 10px;
-                box-shadow: 0 0 20px rgba(0,0,0,0.5);
-                z-index: 10000;
-                font-family: Arial, sans-serif;
-                text-align: center;
-            `;
-            popup.innerHTML = `
-                <h3 style="color: green; margin: 0 0 10px 0;">✅ КНОПКА ВХОДА РАБОТАЕТ!</h3>
-                <p style="margin: 0 0 15px 0;">Функция handleLogin() успешно вызвана</p>
-                <button onclick="this.parentElement.remove()" style="background: green; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">OK</button>
-            `;
-            document.body.appendChild(popup);
+            // Simulate successful login and show main app
+            console.log('🔄 Simulating successful login...');
 
-            console.log('✅ Login popup created and shown');
+            // Hide auth screen and show main app
+            if (authScreenElement && appElement) {
+                authScreenElement.style.display = 'none';
+                appElement.style.display = 'flex';
+                console.log('✅ Successfully switched to main app');
+            } else {
+                console.error('❌ Could not find authScreen or app elements');
+            }
+
+            // Show success message
+            setTimeout(() => {
+                const popup = document.createElement('div');
+                popup.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    background: #4caf50;
+                    color: white;
+                    padding: 15px 20px;
+                    border-radius: 10px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                    z-index: 10000;
+                    font-family: Arial, sans-serif;
+                    animation: slideInRight 0.3s ease-out;
+                `;
+                popup.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 20px;">✅</span>
+                        <div>
+                            <div style="font-weight: bold;">Вход выполнен!</div>
+                            <div style="font-size: 14px;">Добро пожаловать в Chat by Fan</div>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(popup);
+
+                // Add slideInRight animation
+                const style = document.createElement('style');
+                style.textContent = `
+                    @keyframes slideInRight {
+                        from { transform: translateX(100%); opacity: 0; }
+                        to { transform: translateX(0); opacity: 1; }
+                    }
+                `;
+                document.head.appendChild(style);
+
+                // Auto remove after 3 seconds
+                setTimeout(() => {
+                    if (popup.parentNode) {
+                        popup.parentNode.removeChild(popup);
+                    }
+                }, 3000);
+            }, 500);
+
+            console.log('✅ Login process completed successfully');
         }
 
         function handleRegister() {
             console.log('📝 Handling register...');
 
-            // Create visible popup instead of alert
-            const popup = document.createElement('div');
-            popup.style.cssText = `
-                position: fixed;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                background: white;
-                border: 2px solid blue;
-                padding: 20px;
-                border-radius: 10px;
-                box-shadow: 0 0 20px rgba(0,0,0,0.5);
-                z-index: 10000;
-                font-family: Arial, sans-serif;
-                text-align: center;
-            `;
-            popup.innerHTML = `
-                <h3 style="color: blue; margin: 0 0 10px 0;">✅ КНОПКА РЕГИСТРАЦИИ РАБОТАЕТ!</h3>
-                <p style="margin: 0 0 15px 0;">Функция handleRegister() успешно вызвана</p>
-                <button onclick="this.parentElement.remove()" style="background: blue; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">OK</button>
-            `;
-            document.body.appendChild(popup);
+            // Simulate successful registration and show main app
+            console.log('🔄 Simulating successful registration...');
 
-            console.log('✅ Register popup created and shown');
+            // Hide auth screen and show main app
+            if (authScreenElement && appElement) {
+                authScreenElement.style.display = 'none';
+                appElement.style.display = 'flex';
+                console.log('✅ Successfully switched to main app after registration');
+            } else {
+                console.error('❌ Could not find authScreen or app elements');
+            }
+
+            // Show success message
+            setTimeout(() => {
+                const popup = document.createElement('div');
+                popup.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    background: #2196f3;
+                    color: white;
+                    padding: 15px 20px;
+                    border-radius: 10px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                    z-index: 10000;
+                    font-family: Arial, sans-serif;
+                    animation: slideInRight 0.3s ease-out;
+                `;
+                popup.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 20px;">✅</span>
+                        <div>
+                            <div style="font-weight: bold;">Регистрация выполнена!</div>
+                            <div style="font-size: 14px;">Добро пожаловать в Chat by Fan</div>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(popup);
+
+                // Add slideInRight animation
+                const style = document.createElement('style');
+                style.textContent = `
+                    @keyframes slideInRight {
+                        from { transform: translateX(100%); opacity: 0; }
+                        to { transform: translateX(0); opacity: 1; }
+                    }
+                `;
+                document.head.appendChild(style);
+
+                // Auto remove after 3 seconds
+                setTimeout(() => {
+                    if (popup.parentNode) {
+                        popup.parentNode.removeChild(popup);
+                    }
+                }, 3000);
+            }, 500);
+
+            console.log('✅ Registration process completed successfully');
         }
 
         window.initAuth = initAuth;
