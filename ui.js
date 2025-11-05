@@ -320,24 +320,18 @@ async function uploadAvatar(file) {
     try {
         showNotification('Загрузка аватарки...', 'info');
 
-        // Create unique filename with timestamp
-        const timestamp = Date.now();
-        const fileName = `avatar_${window.currentUser().uid}_${timestamp}`;
-        const storageRef = window.storageRef(window.storage, `avatars/${fileName}`);
+        // Convert file to base64 for local storage (since Firebase Storage has CORS issues on GitHub Pages)
+        const base64String = await fileToBase64(file);
 
-        // Upload file
-        const snapshot = await window.uploadBytes(storageRef, file);
-        const downloadURL = await window.getDownloadURL(snapshot.ref);
-
-        // Update user profile in database
+        // Update user profile in database with base64 data
         await window.update(window.dbRef(window.database, `users/${window.currentUser().uid}`), {
-            avatar: downloadURL
+            avatar: base64String
         });
 
         // Update local avatar display immediately
         const userAvatar = document.getElementById('userAvatar');
         if (userAvatar) {
-            userAvatar.src = downloadURL;
+            userAvatar.src = base64String;
         }
 
         showNotification('Аватарка успешно обновлена!', 'success');
@@ -346,6 +340,16 @@ async function uploadAvatar(file) {
         console.error('Error uploading avatar:', error);
         showNotification('Ошибка загрузки аватарки', 'error');
     }
+}
+
+// Helper function to convert file to base64
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+    });
 }
 
 // Export functions

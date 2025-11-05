@@ -142,6 +142,20 @@ async function registerUser() {
         return;
     }
 
+    // Check for Russian characters
+    const russianRegex = /[а-яё]/i;
+    if (russianRegex.test(username)) {
+        alert('Никнейм не может содержать русские буквы');
+        return;
+    }
+
+    // Check for only English letters and underscores (no numbers)
+    const validUsernameRegex = /^[a-zA-Z_]+$/;
+    if (!validUsernameRegex.test(username)) {
+        alert('Никнейм может содержать только английские буквы и нижнее подчеркивание');
+        return;
+    }
+
     if (password.length < 6) {
         alert('Пароль должен содержать минимум 6 символов');
         return;

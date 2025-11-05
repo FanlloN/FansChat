@@ -137,9 +137,24 @@ function createChatItem(chatId, chatData) {
                 ${chatData.lastMessage ? formatLastMessage(chatData.lastMessage) : 'Нет сообщений'}
             </div>
         </div>
+        <button class="delete-chat-btn" data-chat-id="${chatId}" title="Удалить чат">🗑️</button>
     `;
 
-    chatItem.addEventListener('click', () => openChat(chatId));
+    chatItem.addEventListener('click', (e) => {
+        // Don't open chat if delete button was clicked
+        if (e.target.classList.contains('delete-chat-btn')) {
+            return;
+        }
+        openChat(chatId);
+    });
+
+    // Add delete button event listener
+    const deleteBtn = chatItem.querySelector('.delete-chat-btn');
+    deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteChat(chatId);
+    });
+
     return chatItem;
 }
 
@@ -264,23 +279,42 @@ async function startNewChat() {
     }
 
     try {
-        // For now, create a demo chat with a placeholder user
-        // In production, this would search for real users
-        const demoUserId = `demo_${username}`;
+        // Check if user exists in the database
+        const userRef = window.dbRef(window.database, `users`);
+        const userSnapshot = await window.get(userRef);
+        const users = userSnapshot.val();
+
+        // Find user by username
+        let targetUserId = null;
+        let targetUserData = null;
+
+        for (const [uid, userData] of Object.entries(users || {})) {
+            if (userData.username === username) {
+                targetUserId = uid;
+                targetUserData = userData;
+                break;
+            }
+        }
+
+        if (!targetUserId) {
+            alert('Пользователь с таким именем не найден');
+            return;
+        }
+
         const currentUserId = window.currentUser().uid;
 
-        // Check if demo chat already exists
-        const existingChatId = findExistingChat(demoUserId);
+        // Check if chat already exists
+        const existingChatId = findExistingChat(targetUserId);
         if (existingChatId) {
             openChat(existingChatId);
             closeModal();
             return;
         }
 
-        // Create new demo chat
+        // Create new chat
         const chatData = {
             type: 'private',
-            participants: [currentUserId, demoUserId],
+            participants: [currentUserId, targetUserId],
             createdAt: Date.now(),
             createdBy: currentUserId
         };
@@ -288,19 +322,10 @@ async function startNewChat() {
         const newChatRef = window.push(window.dbRef(window.database, 'chats'));
         await window.set(newChatRef, chatData);
 
-        // Add chat to current user
+        // Add chat to both users
         const chatId = newChatRef.key;
         await window.set(window.dbRef(window.database, `userChats/${currentUserId}/${chatId}`), true);
-
-        // Add demo user to users collection
-        await window.set(window.dbRef(window.database, `users/${demoUserId}`), {
-            uid: demoUserId,
-            username: username,
-            displayName: username,
-            avatar: null,
-            online: false,
-            lastSeen: Date.now()
-        });
+        await window.set(window.dbRef(window.database, `userChats/${targetUserId}/${chatId}`), true);
 
         openChat(chatId);
         closeModal();
@@ -395,13 +420,6 @@ function setupEventListeners() {
         }
     });
 
-    emojiBtn.addEventListener('click', toggleEmojiPicker);
-    emojiPicker.addEventListener('click', (e) => {
-        if (e.target.tagName === 'SPAN') {
-            messageInput.value += e.target.textContent;
-            emojiPicker.style.display = 'none';
-        }
-    });
 
     newChatBtn.addEventListener('click', () => {
         newChatModal.style.display = 'flex';
@@ -452,6 +470,37 @@ function formatTime(timestamp) {
         return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
     } else {
         return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+    }
+}
+
+// Delete Chat
+async function deleteChat(chatId) {
+    if (!confirm('Вы уверены, что хотите удалить этот чат?')) {
+        return;
+    }
+
+    try {
+        const currentUserId = window.currentUser().uid;
+
+        // Remove chat from user's chat list
+        await window.remove(window.dbRef(window.database, `userChats/${currentUserId}/${chatId}`));
+
+        // If this chat is currently open, close it
+        if (currentChat && currentChat.id === chatId) {
+            currentChat = null;
+            updateChatUI();
+        }
+
+        // Remove from local chats map
+        chats.delete(chatId);
+
+        // Update UI
+        renderChatsList();
+
+        showNotification('Чат удален', 'success');
+    } catch (error) {
+        console.error('Error deleting chat:', error);
+        showNotification('Ошибка удаления чата', 'error');
     }
 }
 
