@@ -74,6 +74,9 @@ function loadChats() {
             }
         });
 
+        // Ensure news channel exists for all users
+        ensureNewsChannel();
+
         renderChatsList();
     });
 }
@@ -147,21 +150,30 @@ function createChatItem(chatId, chatData) {
         chatItem.classList.add('active');
     }
 
-    // Private chat
-    const otherParticipantId = chatData.participants.find(id => id !== window.currentUser().uid);
-    const otherParticipant = users.get(otherParticipantId);
+    let chatName, chatAvatarSrc, showDeleteBtn;
 
-    // Listen for avatar changes
-    if (otherParticipantId && !users.has(otherParticipantId)) {
-        loadUserInfo(otherParticipantId);
+    if (chatData.type === 'channel') {
+        // Channel
+        chatName = chatData.name || 'Канал';
+        chatAvatarSrc = chatData.avatar || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjUwIiBmaWxsPSIjNDQ0NGZmIi8+Cjx0ZXh0IHg9IjUwIiB5PSI3MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtc2l6ZT0iMzAiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiI+📰PC90ZXh0Pgo8L3N2Zz4=';
+        showDeleteBtn = false; // Channels cannot be deleted by users
+    } else {
+        // Private chat
+        const otherParticipantId = chatData.participants.find(id => id !== window.currentUser().uid);
+        const otherParticipant = users.get(otherParticipantId);
+
+        // Listen for avatar changes
+        if (otherParticipantId && !users.has(otherParticipantId)) {
+            loadUserInfo(otherParticipantId);
+        }
+
+        const defaultAvatar = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjUwIiBmaWxsPSIjNjY2NjY2Ii8+Cjx0ZXh0IHg9IjUwIiB5PSI2NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtc2l6ZT0iNDAiPkDwn5iKPC90ZXh0Pgo8L3N2Zz4=';
+        chatName = otherParticipant?.displayName ?
+            `${otherParticipant.displayName} (${otherParticipant.username})` :
+            (otherParticipant?.username || 'Неизвестный');
+        chatAvatarSrc = otherParticipant?.avatar || defaultAvatar;
+        showDeleteBtn = true;
     }
-
-    const defaultAvatar = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjUwIiBmaWxsPSIjNjY2NjY2Ii8+Cjx0ZXh0IHg9IjUwIiB5PSI2NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtc2l6ZT0iNDAiPkDwn5iKPC90ZXh0Pgo8L3N2Zz4=';
-    const chatName = otherParticipant?.displayName ?
-        `${otherParticipant.displayName} (${otherParticipant.username})` :
-        (otherParticipant?.username || 'Неизвестный');
-    const chatAvatarSrc = otherParticipant?.avatar || defaultAvatar;
-    const showDeleteBtn = true;
 
     chatItem.innerHTML = `
         <div class="chat-avatar">
@@ -525,6 +537,15 @@ async function sendMessage() {
     const text = messageInput.value.trim();
     if (!text || !currentChat) return;
 
+    // Check if user can write in this channel
+    if (currentChat.data.type === 'channel') {
+        const currentUsername = users.get(window.currentUser().uid)?.username;
+        if (currentUsername !== 'FanlloN') {
+            showNotification('Только администратор может писать в этот канал', 'error');
+            return;
+        }
+    }
+
     // Basic validation
     if (text.length > 2000) {
         showNotification('Сообщение слишком длинное (максимум 2000 символов)', 'error');
@@ -575,15 +596,17 @@ async function sendMessage() {
             lastMessage: messageData
         });
 
-        // Show notification for other participants
-        const otherParticipantId = currentChat.data.participants.find(id => id !== window.currentUser().uid);
-        if (otherParticipantId) {
-            const userRef = window.dbRef(window.database, `users/${otherParticipantId}`);
-            const snapshot = await window.get(userRef);
-            const userData = snapshot.val();
-            if (userData) {
-                const senderName = users.get(window.currentUser().uid)?.displayName || users.get(window.currentUser().uid)?.username || 'Пользователь';
-                window.showBrowserNotification('Новое сообщение', `${senderName}: ${text.substring(0, 50)}${text.length > 50 ? '...' : ''}`);
+        // Show notification for other participants (only for private/group chats)
+        if (currentChat.data.type !== 'channel') {
+            const otherParticipantId = currentChat.data.participants.find(id => id !== window.currentUser().uid);
+            if (otherParticipantId) {
+                const userRef = window.dbRef(window.database, `users/${otherParticipantId}`);
+                const snapshot = await window.get(userRef);
+                const userData = snapshot.val();
+                if (userData) {
+                    const senderName = users.get(window.currentUser().uid)?.displayName || users.get(window.currentUser().uid)?.username || 'Пользователь';
+                    window.showBrowserNotification('Новое сообщение', `${senderName}: ${text.substring(0, 50)}${text.length > 50 ? '...' : ''}`);
+                }
             }
         }
 
@@ -769,12 +792,19 @@ function updateChatUI() {
 
     emptyState.style.display = 'none';
     chatHeader.style.display = 'flex';
-    messageInputContainer.style.display = 'flex';
 
     // Update reply input container
     updateReplyInput();
 
     const chatData = currentChat.data;
+
+    // Hide message input for channels (read-only for non-admins)
+    if (chatData.type === 'channel') {
+        const currentUsername = users.get(window.currentUser().uid)?.username;
+        messageInputContainer.style.display = currentUsername === 'FanlloN' ? 'flex' : 'none';
+    } else {
+        messageInputContainer.style.display = 'flex';
+    }
 
     if (chatData.type === 'group') {
         // Group chat header
@@ -789,6 +819,13 @@ function updateChatUI() {
             <button onclick="openGroupSettings()" style="background: none; border: none; color: var(--primary); cursor: pointer; font-size: 14px;">⚙️ Настройки</button>
         `;
         chatAvatar.src = chatData.avatar || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjUwIiBmaWxsPSIjNjY2NjY2Ii8+Cjx0ZXh0IHg9IjUwIiB5PSI3MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtc2l6ZT0iNDAiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiI+👥PC90ZXh0Pgo8L3N2Zz4=';
+    } else if (chatData.type === 'channel') {
+        // Channel header
+        chatHeader.classList.remove('group-chat-header');
+
+        chatName.textContent = chatData.name || 'Канал';
+        chatStatus.textContent = 'Канал';
+        chatAvatar.src = chatData.avatar || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjUwIiBmaWxsPSIjNDQ0NGZmIi8+Cjx0ZXh0IHg9IjUwIiB5PSI3MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtc2l6ZT0iMzAiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiI+📰PC90ZXh0Pgo8L3N2Zz4=';
     } else {
         // Private chat header
         chatHeader.classList.remove('group-chat-header');
@@ -1529,9 +1566,9 @@ async function loadAvailableUsers() {
             addMemberToGroupList(currentUser.uid, usersData[currentUser.uid], true);
         }
 
-        // Load other available users
+        // Load only users with whom current user has private chats
         Object.entries(usersData).forEach(([userId, userData]) => {
-            if (userId !== currentUser?.uid) {
+            if (userId !== currentUser?.uid && hasPrivateChatWith(userId)) {
                 addMemberToGroupList(userId, userData, false);
             }
         });
@@ -1583,24 +1620,40 @@ function addMemberToGroup() {
         }
     }
 
-    // For now, just add as pending member (will be validated when creating group)
-    const groupMembersList = document.getElementById('groupMembersList');
-    const memberItem = document.createElement('div');
-    memberItem.className = 'group-member-item pending-member';
-    memberItem.dataset.username = username;
+    // Find user by username and check if we have a private chat with them
+    findUserByUsername(username).then(userId => {
+        if (!userId) {
+            showNotification('Пользователь не найден', 'error');
+            return;
+        }
 
-    memberItem.innerHTML = `
-        <div class="group-member-info">
-            <div class="group-member-avatar">
-                <div style="width: 100%; height: 100%; background: var(--border); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px;">?</div>
+        if (!hasPrivateChatWith(userId)) {
+            showNotification('Можно добавлять только тех пользователей, с которыми у вас есть личные чаты', 'error');
+            return;
+        }
+
+        // Add as pending member (will be validated when creating group)
+        const groupMembersList = document.getElementById('groupMembersList');
+        const memberItem = document.createElement('div');
+        memberItem.className = 'group-member-item pending-member';
+        memberItem.dataset.username = username;
+
+        memberItem.innerHTML = `
+            <div class="group-member-info">
+                <div class="group-member-avatar">
+                    <div style="width: 100%; height: 100%; background: var(--border); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px;">?</div>
+                </div>
+                <div class="group-member-name">${username} (ожидает)</div>
             </div>
-            <div class="group-member-name">${username} (ожидает)</div>
-        </div>
-        <button class="remove-member-btn" onclick="removePendingMember(this)">&times;</button>
-    `;
+            <button class="remove-member-btn" onclick="removePendingMember(this)">&times;</button>
+        `;
 
-    groupMembersList.appendChild(memberItem);
-    addMemberInput.value = '';
+        groupMembersList.appendChild(memberItem);
+        addMemberInput.value = '';
+    }).catch(error => {
+        console.error('Error finding user:', error);
+        showNotification('Ошибка поиска пользователя', 'error');
+    });
 }
 
 function removePendingMember(button) {
@@ -1640,10 +1693,14 @@ async function createGroupChat() {
             }
         });
 
-        // Validate pending members exist
+        // Validate pending members exist and have private chats
         for (const username of pendingMembers) {
             const userId = await findUserByUsername(username);
             if (userId && typeof userId === 'string') {
+                if (!hasPrivateChatWith(userId)) {
+                    showNotification(`Нельзя добавить ${username} - у вас нет личного чата с этим пользователем`, 'error');
+                    return;
+                }
                 tempParticipants.push(userId);
             } else {
                 showNotification(`Пользователь ${username} не найден`, 'error');
@@ -1711,6 +1768,57 @@ async function findUserByUsername(username) {
     } catch (error) {
         console.error('Error finding user:', error);
         return null;
+    }
+}
+
+// Helper function to check if current user has a private chat with another user
+function hasPrivateChatWith(userId) {
+    const currentUserId = window.currentUser().uid;
+    const chatId = [currentUserId, userId].sort().join('_');
+
+    const chat = chats.get(chatId);
+    return chat && chat.type !== 'group' && chat.participants && chat.participants.length === 2;
+}
+
+// Ensure news channel exists for all users
+async function ensureNewsChannel() {
+    const newsChannelId = 'news_channel';
+    const userId = window.currentUser().uid;
+
+    try {
+        // Check if news channel exists
+        const newsChannelRef = window.dbRef(window.database, `chats/${newsChannelId}`);
+        const snapshot = await window.get(newsChannelRef);
+
+        if (!snapshot.exists()) {
+            // Create news channel
+            const newsChannelData = {
+                id: newsChannelId,
+                name: 'Что нового?',
+                participants: [], // Empty array - all users can read
+                createdAt: Date.now(),
+                createdBy: 'system',
+                type: 'channel',
+                admin: 'FanlloN', // Only FanlloN can write/manage
+                avatar: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjUwIiBmaWxsPSIjNDQ0NGZmIi8+Cjx0ZXh0IHg9IjUwIiB5PSI3MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtc2l6ZT0iMzAiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiI+📰PC90ZXh0Pgo8L3N2Zz4='
+            };
+
+            await window.set(newsChannelRef, newsChannelData);
+        }
+
+        // Add to user's chat list if not already there
+        const userChatRef = window.dbRef(window.database, `userChats/${userId}/${newsChannelId}`);
+        const userChatSnapshot = await window.get(userChatRef);
+
+        if (!userChatSnapshot.exists()) {
+            await window.set(userChatRef, true);
+        }
+
+        // Load news channel details
+        loadChatDetails(newsChannelId);
+
+    } catch (error) {
+        console.error('Error ensuring news channel:', error);
     }
 }
 
@@ -1880,6 +1988,11 @@ async function addNewMemberToGroup() {
             return;
         }
 
+        if (!hasPrivateChatWith(userId)) {
+            showNotification('Можно добавлять только тех пользователей, с которыми у вас есть личные чаты', 'error');
+            return;
+        }
+
         if (currentGroupChat.data.participants.includes(userId)) {
             showNotification('Пользователь уже в группе', 'warning');
             return;
@@ -2006,7 +2119,7 @@ function closeGroupSettingsModal() {
     currentGroupChat = null;
 }
 
-// Update chat rendering for groups
+// Update chat rendering for groups and channels
 function updateChatItemForGroup(chatId, chatData) {
     const chatItem = document.querySelector(`[data-chat-id="${chatId}"]`);
     if (!chatItem) return;
@@ -2021,6 +2134,16 @@ function updateChatItemForGroup(chatId, chatData) {
         chatItem.querySelector('.chat-last-message').innerHTML = `
             ${chatData.lastMessage ? formatLastMessage(chatData.lastMessage) : 'Нет сообщений'}
             <div class="group-members-count">${membersCount} участников</div>
+        `;
+    } else if (chatData.type === 'channel') {
+        chatItem.classList.add('channel-chat-item');
+
+        const channelName = chatData.name || 'Канал';
+
+        chatItem.querySelector('.chat-name').textContent = channelName;
+        chatItem.querySelector('.chat-last-message').innerHTML = `
+            ${chatData.lastMessage ? formatLastMessage(chatData.lastMessage) : 'Нет сообщений'}
+            <div class="channel-indicator">📢 Канал</div>
         `;
     }
 }
