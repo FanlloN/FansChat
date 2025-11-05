@@ -1,2 +1,3 @@
-https://fanllon.github.io/FansChat/
+Open FansChat: https://fanllon.github.io/FansChat/
+
 
