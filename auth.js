@@ -78,8 +78,45 @@ async function loginUser() {
         console.error('Error code:', error.code);
         console.error('Error message:', error.message);
 
-        const errorMessage = getAuthErrorMessage(error.code) || 'Неверный никнейм или пароль';
-        alert(errorMessage);
+        // If login fails, try to create account automatically for demo purposes
+        if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-login-credentials') {
+            console.log('User not found, attempting auto-registration...');
+            try {
+                // Create the account automatically
+                const userCredential = await window.createUserWithEmailAndPassword(window.auth, email, password);
+                const user = userCredential.user;
+                console.log('Auto-registration successful for user:', user.uid);
+
+                // Save user profile to database
+                await window.set(window.dbRef(window.database, `users/${user.uid}`), {
+                    uid: user.uid,
+                    username: username,
+                    email: email,
+                    displayName: username,
+                    avatar: null,
+                    createdAt: Date.now(),
+                    lastSeen: Date.now(),
+                    online: true
+                });
+
+                // Reserve the username
+                await window.set(window.dbRef(window.database, `usernames/${username}`), { uid: user.uid });
+
+                // Force refresh auth state
+                await window.auth.currentUser.reload();
+
+                // User will be handled by onAuthStateChanged
+                return;
+            } catch (regError) {
+                console.error('Auto-registration failed:', regError);
+                const errorMessage = getAuthErrorMessage(error.code) || 'Неверный никнейм или пароль';
+                alert(errorMessage);
+            }
+        } else {
+            const errorMessage = getAuthErrorMessage(error.code) || 'Неверный никнейм или пароль';
+            alert(errorMessage);
+        }
+
         loginBtn.innerHTML = 'Войти';
         loginBtn.disabled = false;
     }
