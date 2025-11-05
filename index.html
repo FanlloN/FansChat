@@ -336,12 +336,12 @@
 
         function handleLogin() {
             console.log('🚪 Handling login...');
-            alert('Login function called!');
+            alert('Login function called! Кнопка работает!');
         }
 
         function handleRegister() {
             console.log('📝 Handling register...');
-            alert('Register function called!');
+            alert('Register function called! Кнопка работает!');
         }
 
         window.initAuth = initAuth;
@@ -370,12 +370,10 @@
             testDiv.innerHTML = `
                 <div style="position: fixed; top: 10px; left: 10px; z-index: 9999; background: yellow; padding: 10px; border: 2px solid red; font-family: monospace; font-size: 12px;">
                     <div style="margin-bottom: 5px; font-weight: bold;">EMERGENCY TESTS:</div>
-                    <button onclick="console.log('🚨 EMERGENCY: Login test'); const btn = document.getElementById('loginBtn'); if(btn){console.log('Found loginBtn, clicking...'); btn.click();}else{console.error('loginBtn not found!');}">TEST LOGIN</button>
-                    <button onclick="console.log('🚨 EMERGENCY: Register test'); const btn = document.getElementById('registerBtn'); if(btn){console.log('Found registerBtn, clicking...'); btn.click();}else{console.error('registerBtn not found!');}">TEST REGISTER</button>
-                    <button onclick="console.log('🚨 EMERGENCY: FAQ test'); const btn = document.getElementById('faqBtn'); if(btn){console.log('Found faqBtn, clicking...'); btn.click();}else{console.error('faqBtn not found!');}">TEST FAQ</button>
-                    <button onclick="console.log('🚨 EMERGENCY: Auth init'); if(typeof window.initAuth === 'function'){console.log('Calling initAuth...'); window.initAuth();}else{console.error('initAuth not found!');}">TEST AUTH INIT</button>
-                    <button onclick="console.log('🚨 EMERGENCY: UI init'); if(typeof window.initUI === 'function'){console.log('Calling initUI...'); window.initUI();}else{console.error('initUI not found!');}">TEST UI INIT</button>
-                    <button onclick="console.log('🚨 EMERGENCY: Check elements'); console.log('loginBtn:', !!document.getElementById('loginBtn')); console.log('registerBtn:', !!document.getElementById('registerBtn')); console.log('faqBtn:', !!document.getElementById('faqBtn'));">CHECK ELEMENTS</button>
+                    <button onclick="console.log('🚨 EMERGENCY: Direct login click'); const btn = document.getElementById('loginBtn'); if(btn){console.log('Found loginBtn, clicking...'); btn.click(); alert('Clicked login button!');}else{alert('loginBtn not found!');}">DIRECT LOGIN</button>
+                    <button onclick="console.log('🚨 EMERGENCY: Direct register click'); const btn = document.getElementById('registerBtn'); if(btn){console.log('Found registerBtn, clicking...'); btn.click(); alert('Clicked register button!');}else{alert('registerBtn not found!');}">DIRECT REGISTER</button>
+                    <button onclick="console.log('🚨 EMERGENCY: Manual alert'); alert('Manual alert works! JavaScript is running!');">MANUAL ALERT</button>
+                    <button onclick="console.log('🚨 EMERGENCY: Check all buttons'); const buttons = ['loginBtn', 'registerBtn', 'faqBtn', 'sendBtn', 'settingsBtn']; buttons.forEach(id => { const el = document.getElementById(id); console.log(id + ':', !!el, el ? 'found' : 'NOT FOUND'); }); alert('Check console for button status!');">CHECK ALL BUTTONS</button>
                 </div>
             `;
             document.body.appendChild(testDiv);
