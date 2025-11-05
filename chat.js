@@ -147,13 +147,19 @@ function initChat() {
     setupEventListeners();
 
     // Start storage cleanup scheduler
-    startStorageCleanupScheduler();
+    if (typeof startStorageCleanupScheduler === 'function') {
+        startStorageCleanupScheduler();
+    }
 
     // Start image compression scheduler
-    startImageCompressionScheduler();
+    if (typeof startImageCompressionScheduler === 'function') {
+        startImageCompressionScheduler();
+    }
 
     // Initialize security monitoring (light version)
-    initSecurityMonitoring();
+    if (typeof initSecurityMonitoring === 'function') {
+        initSecurityMonitoring();
+    }
 
     console.log('Chat initialized successfully');
 }
@@ -628,7 +634,7 @@ async function sendMessage() {
     }
 
     const messageData = {
-        text: validation.sanitized,
+        text: messageInput.value.trim(),
         sender: window.currentUser().uid,
         timestamp: Date.now(),
         status: 'sent'
@@ -1418,7 +1424,7 @@ function cancelReply() {
 
 // Initialize Security Monitoring
 function initSecurityMonitoring() {
-    // Monitor for suspicious DOM manipulation
+    // Basic monitoring for suspicious DOM manipulation
     const observer = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
             if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
@@ -1426,10 +1432,7 @@ function initSecurityMonitoring() {
                     if (node.nodeType === Node.ELEMENT_NODE) {
                         const tagName = node.tagName.toLowerCase();
                         if (tagName === 'script' || tagName === 'iframe' || tagName === 'object') {
-                            window.securityCore.triggerSecurityAlert('SUSPICIOUS_DOM_MANIPULATION', {
-                                tagName,
-                                nodeType: node.nodeType
-                            });
+                            console.warn('Suspicious DOM manipulation detected:', tagName);
                         }
                     }
                 });
@@ -1441,39 +1444,13 @@ function initSecurityMonitoring() {
         childList: true,
         subtree: true
     });
-
-    // Monitor network requests
-    const originalFetch = window.fetch;
-    window.fetch = function(...args) {
-        window.securityCore.analyzeBehavior('network_request', { url: args[0] });
-        return originalFetch.apply(this, args);
-    };
-
-    // Monitor XMLHttpRequest
-    const originalOpen = XMLHttpRequest.prototype.open;
-    XMLHttpRequest.prototype.open = function(method, url) {
-        window.securityCore.analyzeBehavior('xhr_request', { method, url });
-        return originalOpen.apply(this, arguments);
-    };
 }
 
-// Start Image Compression Scheduler with Security
+// Start Image Compression Scheduler
 function startImageCompressionScheduler() {
-    // Security check before compression
-    if (!window.securityCore.checkRateLimit('compression_scheduler')) {
-        window.securityCore.triggerSecurityAlert('COMPRESSION_RATE_LIMIT_EXCEEDED');
-        return;
-    }
-
     // Run compression check every hour
     setInterval(async () => {
         if (!window.currentUser()) return;
-
-        // Additional security validation
-        if (!window.securityCore.validateSession()) {
-            window.securityCore.triggerSecurityAlert('INVALID_SESSION_COMPRESSION');
-            return;
-        }
 
         try {
             const userId = window.currentUser().uid;
@@ -1489,18 +1466,12 @@ function startImageCompressionScheduler() {
             await Promise.all(compressionPromises);
         } catch (error) {
             console.error('Error in image compression scheduler:', error);
-            window.securityCore.triggerSecurityAlert('COMPRESSION_ERROR', { error: error.message });
         }
     }, 60 * 60 * 1000); // Every hour
 
-    // Also run immediately on startup with security delay
+    // Also run immediately on startup
     setTimeout(async () => {
         if (!window.currentUser()) return;
-
-        if (!window.securityCore.validateSession()) {
-            window.securityCore.triggerSecurityAlert('INVALID_SESSION_INITIAL_COMPRESSION');
-            return;
-        }
 
         try {
             const userId = window.currentUser().uid;
@@ -1515,9 +1486,8 @@ function startImageCompressionScheduler() {
             await Promise.all(compressionPromises);
         } catch (error) {
             console.error('Error in initial image compression:', error);
-            window.securityCore.triggerSecurityAlert('INITIAL_COMPRESSION_ERROR', { error: error.message });
         }
-    }, 10000); // 10 seconds after startup (increased for security)
+    }, 5000); // 5 seconds after startup
 }
 
 // Export functions
