@@ -1,5 +1,4 @@
 // Chat Module
-const GLOBAL_CHAT_ID = 'global_chat';
 let currentChat = null;
 let chats = new Map();
 let messages = new Map();
@@ -43,12 +42,6 @@ function loadChats() {
         const userChats = snapshot.val() || {};
         chats.clear();
 
-        // Always include global chat
-        if (!userChats[GLOBAL_CHAT_ID]) {
-            // Add global chat to user's chat list if not present
-            window.set(window.dbRef(window.database, `userChats/${userId}/${GLOBAL_CHAT_ID}`), true);
-        }
-
         // Load chat details for each chat
         Object.keys(userChats).forEach(chatId => {
             loadChatDetails(chatId);
@@ -68,15 +61,6 @@ function loadChatDetails(chatId) {
             chats.set(chatId, chatData);
             loadLastMessage(chatId);
             renderChatsList();
-        } else if (chatId === GLOBAL_CHAT_ID) {
-            // Create global chat if it doesn't exist
-            const globalChatData = {
-                type: 'global',
-                participants: [],
-                createdAt: Date.now(),
-                createdBy: 'system'
-            };
-            window.set(chatRef, globalChatData);
         }
     });
 }
@@ -132,28 +116,19 @@ function createChatItem(chatId, chatData) {
         chatItem.classList.add('active');
     }
 
-    let chatName, chatAvatarSrc, showDeleteBtn;
+    // Private chat
+    const otherParticipantId = chatData.participants.find(id => id !== window.currentUser().uid);
+    const otherParticipant = users.get(otherParticipantId);
 
-    if (chatId === GLOBAL_CHAT_ID) {
-        // Global chat
-        chatName = 'Общий чат';
-        chatAvatarSrc = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjUwIiBmaWxsPSIjNDI4NWY0Ii8+Cjx0ZXh0IHg9IjUwIiB5PSI2NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtc2l6ZT0iMzAiPkDwn5iKPC90ZXh0Pgo8L3N2Zz4=';
-        showDeleteBtn = false;
-    } else {
-        // Private chat
-        const otherParticipantId = chatData.participants.find(id => id !== window.currentUser().uid);
-        const otherParticipant = users.get(otherParticipantId);
-
-        // Listen for avatar changes
-        if (otherParticipantId && !users.has(otherParticipantId)) {
-            loadUserInfo(otherParticipantId);
-        }
-
-        const defaultAvatar = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjUwIiBmaWxsPSIjNjY2NjY2Ii8+Cjx0ZXh0IHg9IjUwIiB5PSI2NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtc2l6ZT0iNDAiPkDwn5iKPC90ZXh0Pgo8L3N2Zz4=';
-        chatName = otherParticipant?.displayName || otherParticipant?.username || 'Неизвестный';
-        chatAvatarSrc = otherParticipant?.avatar || defaultAvatar;
-        showDeleteBtn = true;
+    // Listen for avatar changes
+    if (otherParticipantId && !users.has(otherParticipantId)) {
+        loadUserInfo(otherParticipantId);
     }
+
+    const defaultAvatar = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjUwIiBmaWxsPSIjNjY2NjY2Ii8+Cjx0ZXh0IHg9IjUwIiB5PSI2NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtc2l6ZT0iNDAiPkDwn5iKPC90ZXh0Pgo8L3N2Zz4=';
+    const chatName = otherParticipant?.displayName || otherParticipant?.username || 'Неизвестный';
+    const chatAvatarSrc = otherParticipant?.avatar || defaultAvatar;
+    const showDeleteBtn = true;
 
     chatItem.innerHTML = `
         <div class="chat-avatar">
@@ -259,9 +234,14 @@ function createMessageElement(messageId, messageData) {
 
     console.log('Avatar src for', isOwn ? 'own' : 'other', 'message:', avatarSrc);
 
+    const senderName = isOwn ?
+        (users.get(window.currentUser().uid)?.displayName || users.get(window.currentUser().uid)?.username || 'Вы') :
+        (sender?.displayName || sender?.username || 'Неизвестный');
+
     messageDiv.innerHTML = `
         ${!isOwn ? `<div class="message-avatar"><img src="${avatarSrc}" alt="Avatar"></div>` : ''}
         <div class="message-content">
+            ${!isOwn ? `<div class="message-sender">${senderName}</div>` : ''}
             <div class="message-bubble">${messageData.text}</div>
             <div class="message-time">${time}</div>
         </div>
@@ -303,10 +283,72 @@ async function sendMessage() {
 
 // Start New Chat
 async function startNewChat() {
-    // For global chat system, just open the global chat
-    openChat(GLOBAL_CHAT_ID);
-    closeModal();
-    newChatUsername.value = '';
+    const username = newChatUsername.value.trim();
+    if (!username) {
+        showNotification('Введите имя пользователя', 'error');
+        return;
+    }
+
+    try {
+        // Find user by username
+        const usersRef = window.dbRef(window.database, 'users');
+        const snapshot = await window.get(usersRef);
+        const usersData = snapshot.val();
+
+        let targetUserId = null;
+        for (const [userId, userData] of Object.entries(usersData || {})) {
+            if (userData.username === username || userData.displayName === username) {
+                targetUserId = userId;
+                break;
+            }
+        }
+
+        if (!targetUserId) {
+            showNotification('Пользователь не найден', 'error');
+            return;
+        }
+
+        if (targetUserId === window.currentUser().uid) {
+            showNotification('Нельзя начать чат с самим собой', 'error');
+            return;
+        }
+
+        // Check if chat already exists
+        const existingChatId = findExistingChat(targetUserId);
+        if (existingChatId) {
+            openChat(existingChatId);
+            closeModal();
+            newChatUsername.value = '';
+            return;
+        }
+
+        // Create new chat
+        const participants = [window.currentUser().uid, targetUserId].sort();
+        const chatId = participants.join('_');
+
+        const chatData = {
+            participants: participants,
+            createdAt: Date.now(),
+            createdBy: window.currentUser().uid
+        };
+
+        // Save chat data
+        await window.set(window.dbRef(window.database, `chats/${chatId}`), chatData);
+
+        // Add to both users' chat lists
+        await window.set(window.dbRef(window.database, `userChats/${window.currentUser().uid}/${chatId}`), true);
+        await window.set(window.dbRef(window.database, `userChats/${targetUserId}/${chatId}`), true);
+
+        // Open the new chat
+        openChat(chatId);
+        closeModal();
+        newChatUsername.value = '';
+
+        showNotification('Чат создан!', 'success');
+    } catch (error) {
+        console.error('Error creating chat:', error);
+        showNotification('Ошибка создания чата', 'error');
+    }
 }
 
 // Find Existing Chat (now redundant but kept for compatibility)
@@ -364,33 +406,25 @@ function updateChatUI() {
     chatHeader.style.display = 'flex';
     messageInputContainer.style.display = 'flex';
 
-    if (currentChat.id === GLOBAL_CHAT_ID) {
-        // Global chat header
-        const globalAvatar = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjUwIiBmaWxsPSIjNDI4NWY0Ii8+Cjx0ZXh0IHg9IjUwIiB5PSI2NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtc2l6ZT0iMzAiPkDwn5iKPC90ZXh0Pgo8L3N2Zz4=';
-        chatName.textContent = 'Общий чат';
-        chatStatus.textContent = 'Все пользователи';
-        chatAvatar.src = globalAvatar;
-    } else {
-        // Private chat header
-        const otherParticipantId = currentChat.data.participants.find(id => id !== window.currentUser().uid);
-        const otherParticipant = users.get(otherParticipantId);
+    // Private chat header
+    const otherParticipantId = currentChat.data.participants.find(id => id !== window.currentUser().uid);
+    const otherParticipant = users.get(otherParticipantId);
 
-        const defaultAvatar = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjUwIiBmaWxsPSIjNjY2NjY2Ii8+Cjx0ZXh0IHg9IjUwIiB5PSI2NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtc2l6ZT0iNDAiPkDwn5iKPC90ZXh0Pgo8L3N2Zz4=';
+    const defaultAvatar = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjUwIiBmaWxsPSIjNjY2NjY2Ii8+Cjx0ZXh0IHg9IjUwIiB5PSI2NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtc2l6ZT0iNDAiPkDwn5iKPC90ZXh0Pgo8L3N2Zz4=';
 
-        chatName.textContent = otherParticipant?.displayName || otherParticipant?.username || 'Неизвестный';
-        chatStatus.textContent = otherParticipant?.online ? 'онлайн' : 'был(а) недавно';
-        chatAvatar.src = otherParticipant?.avatar || defaultAvatar;
+    chatName.textContent = otherParticipant?.displayName || otherParticipant?.username || 'Неизвестный';
+    chatStatus.textContent = otherParticipant?.online ? 'онлайн' : 'был(а) недавно';
+    chatAvatar.src = otherParticipant?.avatar || defaultAvatar;
 
-        // Update chat header with real-time avatar changes
-        if (otherParticipantId) {
-            const userRef = window.dbRef(window.database, `users/${otherParticipantId}`);
-            window.onValue(userRef, (snapshot) => {
-                const userData = snapshot.val();
-                if (userData) {
-                    chatAvatar.src = userData.avatar || defaultAvatar;
-                }
-            });
-        }
+    // Update chat header with real-time avatar changes
+    if (otherParticipantId) {
+        const userRef = window.dbRef(window.database, `users/${otherParticipantId}`);
+        window.onValue(userRef, (snapshot) => {
+            const userData = snapshot.val();
+            if (userData) {
+                chatAvatar.src = userData.avatar || defaultAvatar;
+            }
+        });
     }
 }
 
@@ -459,11 +493,6 @@ function formatTime(timestamp) {
 
 // Delete Chat
 async function deleteChat(chatId) {
-    if (chatId === GLOBAL_CHAT_ID) {
-        alert('Нельзя удалить общий чат');
-        return;
-    }
-
     if (!confirm('Вы уверены, что хотите удалить этот чат?')) {
         return;
     }

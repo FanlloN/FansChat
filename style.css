@@ -644,6 +644,14 @@ body.dark-theme .messages-container {
     position: relative;
 }
 
+.message-sender {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-light);
+    margin-bottom: 4px;
+    opacity: 0.8;
+}
+
 .message-bubble {
     padding: 10px 15px;
     border-radius: var(--tg-radius);
