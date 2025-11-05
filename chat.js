@@ -488,6 +488,8 @@ function createMessageElement(messageId, messageData) {
         messageContent = `<div class="message-text">${messageData.text}${messageData.edited ? ' <span class="edited-indicator" title="Отредактировано">(изменено)</span>' : ''}</div>`;
     }
 
+    const chatData = currentChat ? currentChat.data : null;
+
     messageDiv.innerHTML = `
         ${!isOwn ? `<div class="message-avatar"><img src="${avatarSrc}" alt="Avatar"></div>` : ''}
         <div class="message-content">
@@ -497,8 +499,8 @@ function createMessageElement(messageId, messageData) {
                 ${messageContent}
                 <div class="message-actions">
                     <button class="reply-btn" onclick="replyToMessage('${messageId}')" title="Ответить">↩️</button>
-                    ${isOwn && chatData.type !== 'channel' ? `<button class="edit-btn" onclick="editMessage('${messageId}')" title="Редактировать">✏️</button>` : ''}
-                    ${chatData.type !== 'channel' ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')" title="Удалить">🗑️</button>` : ''}
+                    ${isOwn && chatData && chatData.type !== 'channel' ? `<button class="edit-btn" onclick="editMessage('${messageId}')" title="Редактировать">✏️</button>` : ''}
+                    ${chatData && chatData.type !== 'channel' ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')" title="Удалить">🗑️</button>` : ''}
                 </div>
             </div>
             <div class="message-time">${time}</div>
@@ -928,6 +930,53 @@ function updateReplyInput() {
         if (existingReply) {
             existingReply.remove();
         }
+    }
+}
+
+// Block User Function
+async function blockUser() {
+    if (!currentChat || !currentChat.data || currentChat.data.type !== 'private') {
+        showNotification('Можно блокировать только в личных чатах', 'error');
+        return;
+    }
+
+    const otherParticipantId = currentChat.data.participants.find(id => id !== window.currentUser().uid);
+    if (!otherParticipantId) {
+        showNotification('Не удалось найти пользователя для блокировки', 'error');
+        return;
+    }
+
+    const otherParticipant = users.get(otherParticipantId);
+    const username = otherParticipant?.displayName || otherParticipant?.username || 'этого пользователя';
+
+    if (!confirm(`Вы уверены, что хотите заблокировать ${username}? Вы больше не сможете общаться с этим пользователем.`)) {
+        return;
+    }
+
+    try {
+        // Add to blocked users list
+        const currentUserId = window.currentUser().uid;
+        const blockedUsersRef = window.dbRef(window.database, `users/${currentUserId}/blockedUsers`);
+        const snapshot = await window.get(blockedUsersRef);
+        const blockedUsers = snapshot.val() || [];
+
+        if (!blockedUsers.includes(otherParticipantId)) {
+            blockedUsers.push(otherParticipantId);
+            await window.set(blockedUsersRef, blockedUsers);
+        }
+
+        // Remove chat from user's chat list
+        await window.remove(window.dbRef(window.database, `userChats/${currentUserId}/${currentChat.id}`));
+
+        // Close current chat
+        currentChat = null;
+        updateChatUI();
+        renderChatsList();
+
+        showNotification(`${username} заблокирован`, 'success');
+    } catch (error) {
+        console.error('Error blocking user:', error);
+        showNotification('Ошибка блокировки пользователя', 'error');
     }
 }
 
@@ -2419,6 +2468,53 @@ function updateChatItemForGroup(chatId, chatData) {
     }
 }
 
+// Block User Function
+async function blockUser() {
+    if (!currentChat || !currentChat.data || currentChat.data.type !== 'private') {
+        showNotification('Можно блокировать только в личных чатах', 'error');
+        return;
+    }
+
+    const otherParticipantId = currentChat.data.participants.find(id => id !== window.currentUser().uid);
+    if (!otherParticipantId) {
+        showNotification('Не удалось найти пользователя для блокировки', 'error');
+        return;
+    }
+
+    const otherParticipant = users.get(otherParticipantId);
+    const username = otherParticipant?.displayName || otherParticipant?.username || 'этого пользователя';
+
+    if (!confirm(`Вы уверены, что хотите заблокировать ${username}? Вы больше не сможете общаться с этим пользователем.`)) {
+        return;
+    }
+
+    try {
+        // Add to blocked users list
+        const currentUserId = window.currentUser().uid;
+        const blockedUsersRef = window.dbRef(window.database, `users/${currentUserId}/blockedUsers`);
+        const snapshot = await window.get(blockedUsersRef);
+        const blockedUsers = snapshot.val() || [];
+
+        if (!blockedUsers.includes(otherParticipantId)) {
+            blockedUsers.push(otherParticipantId);
+            await window.set(blockedUsersRef, blockedUsers);
+        }
+
+        // Remove chat from user's chat list
+        await window.remove(window.dbRef(window.database, `userChats/${currentUserId}/${currentChat.id}`));
+
+        // Close current chat
+        currentChat = null;
+        updateChatUI();
+        renderChatsList();
+
+        showNotification(`${username} заблокирован`, 'success');
+    } catch (error) {
+        console.error('Error blocking user:', error);
+        showNotification('Ошибка блокировки пользователя', 'error');
+    }
+}
+
 // Export functions
 window.initChat = initChat;
 window.openImageModal = openImageModal;
@@ -2442,3 +2538,4 @@ window.deleteMessage = deleteMessage;
 window.editMessage = editMessage;
 window.deleteChatForUser = deleteChatForUser;
 window.togglePinChat = togglePinChat;
+window.blockUser = blockUser;

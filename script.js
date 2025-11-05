@@ -1,45 +1,5 @@
 // Main Script - Initialize all modules
 
-// Firebase Configuration and Initialization
-const firebaseConfig = {
-    apiKey: "AIzaSyCU-2Oa0zjmzyAnBIrluPQbrf2t-lPiikg",
-    authDomain: "chatbyfan-default-rtdb.europe-west1.firebasedatabase.app",
-    databaseURL: "https://chatbyfan-default-rtdb.europe-west1.firebasedatabase.app",
-    projectId: "chatbyfan",
-    storageBucket: "chatbyfan.appspot.com",
-    messagingSenderId: "844332208537",
-    appId: "1:844332208537:web:5b2747debe491ec8610308"
-};
-
-// Initialize Firebase
-window.app = initializeApp(firebaseConfig);
-window.auth = getAuth(window.app);
-window.database = getDatabase(window.app);
-window.storage = getStorage(window.app);
-
-// Firebase functions
-window.dbRef = ref;
-window.onValue = onValue;
-window.push = push;
-window.set = set;
-window.update = update;
-window.remove = remove;
-window.get = get;
-window.query = query;
-window.orderByChild = orderByChild;
-window.limitToLast = limitToLast;
-
-// Auth functions
-window.signInWithEmailAndPassword = signInWithEmailAndPassword;
-window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
-window.signOut = signOut;
-window.onAuthStateChanged = onAuthStateChanged;
-
-// Storage functions
-window.uploadBytes = uploadBytes;
-window.getDownloadURL = getDownloadURL;
-window.ref_storage = ref_storage;
-
 // Browser notification
 window.showBrowserNotification = (title, body) => {
     if ('Notification' in window && Notification.permission === 'granted') {
@@ -50,7 +10,7 @@ window.showBrowserNotification = (title, body) => {
 // Current user function
 window.currentUser = () => window.auth.currentUser;
 
-console.log('Firebase initialized successfully');
+console.log('Script initialized successfully');
 
 // Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
