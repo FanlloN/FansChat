@@ -588,39 +588,47 @@ function cleanupCallSignals(chatId) {
     }
 }
 
-// Manual cleanup function for Firebase (call this from console if needed)
-function cleanupAllCallSignals() {
-    console.log('Starting manual cleanup of all call signals...');
+// Emergency cleanup - force end all calls and clean signals
+function emergencyCleanup() {
+    console.log('🚨 EMERGENCY CLEANUP: Ending all calls and cleaning signals...');
 
     try {
-        // Get all chats
+        // Force end current call if any
+        if (currentCall) {
+            endCall();
+        }
+
+        // Clean up all call signals from all chats
         const userId = window.currentUser().uid;
         const userChatsRef = window.dbRef(window.database, `userChats/${userId}`);
 
         window.get(userChatsRef).then((snapshot) => {
             const userChats = snapshot.val();
             if (userChats) {
-                const chatIds = Object.keys(userChats).filter(id => id !== 'global_chat');
+                const chatIds = Object.keys(userChats);
 
                 chatIds.forEach(chatId => {
+                    // Remove all call signals for this chat
                     const signalsRef = window.dbRef(window.database, `callSignals/${chatId}`);
                     window.remove(signalsRef).then(() => {
-                        console.log(`Cleaned up signals for chat: ${chatId}`);
+                        console.log(`✅ Cleaned signals for chat: ${chatId}`);
                     }).catch(error => {
-                        console.error(`Error cleaning up chat ${chatId}:`, error);
+                        console.error(`❌ Error cleaning chat ${chatId}:`, error);
                     });
                 });
+
+                console.log('🎉 Emergency cleanup completed!');
             }
         }).catch(error => {
-            console.error('Error getting user chats for cleanup:', error);
+            console.error('❌ Error getting user chats:', error);
         });
     } catch (error) {
-        console.error('Error in cleanupAllCallSignals:', error);
+        console.error('❌ Error in emergency cleanup:', error);
     }
 }
 
 // Make function available globally
-window.cleanupAllCallSignals = cleanupAllCallSignals;
+window.emergencyCleanup = emergencyCleanup;
 
 // Export functions
 window.initCalls = initCalls;
