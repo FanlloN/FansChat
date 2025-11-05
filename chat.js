@@ -29,6 +29,7 @@ function initChat() {
     if (!window.currentUser()) return;
 
     loadChats();
+    loadCurrentUserInfo();
     setupEventListeners();
 }
 
@@ -223,7 +224,7 @@ function createMessageElement(messageId, messageData) {
     const defaultAvatar = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjUwIiBmaWxsPSIjNjY2NjY2Ii8+Cjx0ZXh0IHg9IjUwIiB5PSI2NSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiIGZvbnQtc2l6ZT0iNDAiPkDwn5iKPC90ZXh0Pgo8L3N2Zz4=';
 
     const avatarSrc = isOwn ?
-        (window.currentUser()?.photoURL || defaultAvatar) :
+        (users.get(window.currentUser().uid)?.avatar || defaultAvatar) :
         (sender?.avatar || defaultAvatar);
 
     messageDiv.innerHTML = `
@@ -365,6 +366,24 @@ function loadUserInfo(userId) {
             if (currentChat) {
                 renderMessages(currentChat.id);
                 updateChatUI();
+            }
+        }
+    });
+}
+
+// Load current user info
+function loadCurrentUserInfo() {
+    if (!window.currentUser()) return;
+
+    const userId = window.currentUser().uid;
+    const userRef = window.dbRef(window.database, `users/${userId}`);
+    window.onValue(userRef, (snapshot) => {
+        const userData = snapshot.val();
+        if (userData) {
+            users.set(userId, userData);
+            // Update UI when current user avatar changes
+            if (currentChat) {
+                renderMessages(currentChat.id);
             }
         }
     });

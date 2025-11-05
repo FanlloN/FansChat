@@ -619,11 +619,19 @@ body.dark-theme .messages-container {
 }
 
 .message-avatar {
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
-    margin-right: 10px;
+    margin-right: 8px;
     flex-shrink: 0;
+    overflow: hidden;
+}
+
+.message-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
 }
 
 .message.own .message-avatar {
