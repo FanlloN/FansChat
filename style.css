@@ -1104,6 +1104,258 @@ body.dark-theme .message-input-container {
 }
 
 
+/* Call Modal */
+.call-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3000;
+}
+
+.call-container {
+    background: rgba(30, 41, 59, 0.95);
+    backdrop-filter: blur(20px);
+    border-radius: 16px;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+}
+
+.call-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px;
+    background: rgba(15, 23, 42, 0.9);
+    border-bottom: 1px solid rgba(51, 65, 85, 0.5);
+}
+
+.call-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.call-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 2px solid var(--primary);
+}
+
+.call-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.call-details {
+    color: white;
+}
+
+.call-name {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.call-status {
+    font-size: 14px;
+    opacity: 0.8;
+}
+
+.close-call-btn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 50%;
+    transition: background-color 0.3s ease;
+}
+
+.close-call-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.call-content {
+    padding: 20px;
+}
+
+.video-container {
+    position: relative;
+    width: 100%;
+    height: 300px;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 12px;
+}
+
+.call-placeholder {
+    text-align: center;
+    color: white;
+}
+
+.call-placeholder .call-icon {
+    font-size: 48px;
+    margin-bottom: 10px;
+    opacity: 0.7;
+}
+
+.call-placeholder p {
+    font-size: 16px;
+    opacity: 0.8;
+}
+
+.call-controls {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.control-btn {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.control-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+}
+
+.control-btn.active {
+    background: var(--primary);
+}
+
+.control-btn.active:hover {
+    background: var(--primary-dark);
+}
+
+.control-btn.muted {
+    background: var(--error);
+}
+
+.control-btn.muted:hover {
+    background: #dc2626;
+}
+
+.device-select {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 12px;
+    backdrop-filter: blur(10px);
+}
+
+.device-select option {
+    background: rgba(30, 41, 59, 0.9);
+    color: white;
+}
+
+.hangup-btn {
+    background: var(--error);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 25px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.hangup-btn:hover {
+    background: #dc2626;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+}
+
+/* Mobile Call Modal */
+@media (max-width: 768px) {
+    .call-modal {
+        padding: 20px;
+    }
+
+    .call-container {
+        width: 100%;
+        max-width: none;
+        border-radius: 12px;
+    }
+
+    .call-header {
+        padding: 16px;
+    }
+
+    .call-content {
+        padding: 16px;
+    }
+
+    .video-container {
+        height: 250px;
+    }
+
+    .call-controls {
+        gap: 16px;
+    }
+
+    .control-btn {
+        width: 48px;
+        height: 48px;
+        font-size: 18px;
+    }
+
+    .hangup-btn {
+        padding: 10px 20px;
+        font-size: 14px;
+    }
+}
 /* Modal */
 .modal {
     position: fixed;
