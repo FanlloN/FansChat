@@ -40,11 +40,6 @@ function initChat() {
     loadCurrentUserInfo();
     setupEventListeners();
 
-    // Initialize calls
-    if (typeof initCalls === 'function') {
-        initCalls();
-    }
-
     // Start storage cleanup scheduler
     if (typeof startStorageCleanupScheduler === 'function') {
         startStorageCleanupScheduler();
@@ -217,11 +212,6 @@ function openChat(chatId) {
     currentChat = { id: chatId, data: chats.get(chatId) };
     loadMessages(chatId);
     updateChatUI();
-
-    // Start listening for call signals
-    if (typeof listenForCallSignals === 'function') {
-        listenForCallSignals();
-    }
 
     // Mark as active in sidebar
     document.querySelectorAll('.chat-item').forEach(item => {

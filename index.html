@@ -155,7 +155,6 @@
                     <div class="chat-status" id="chatStatus">был(а) недавно</div>
                 </div>
                 <div class="chat-actions">
-                    <button class="call-btn" id="callBtn" title="Позвонить">📞</button>
                     <button class="clear-chat-btn" id="clearChatBtn" title="Очистить чат">🗑️</button>
                 </div>
             </div>
@@ -287,66 +286,6 @@
         </div>
     </div>
 
-    <!-- Call Modal -->
-    <div class="call-modal" id="callModal" style="display: none;">
-        <div class="call-container">
-            <div class="call-header">
-                <div class="call-info">
-                    <div class="call-avatar">
-                        <img id="callAvatar" src="" alt="Call Avatar">
-                    </div>
-                    <div class="call-details">
-                        <div class="call-name" id="callName">Звонок</div>
-                        <div class="call-status" id="callStatus">Звонок...</div>
-                    </div>
-                </div>
-                <button class="close-call-btn" id="closeCallBtn">&times;</button>
-            </div>
-
-            <div class="call-content">
-                <div class="video-container">
-                    <video id="localVideo" autoplay muted playsinline></video>
-                    <video id="remoteVideo" autoplay playsinline></video>
-                    <div class="call-placeholder" id="callPlaceholder">
-                        <div class="call-icon">📞</div>
-                        <p>Подготовка к звонку...</p>
-                    </div>
-                </div>
-
-                <div class="call-controls">
-                    <div class="control-group">
-                        <button class="control-btn" id="cameraBtn" title="Камера">
-                            <span class="control-icon">📹</span>
-                        </button>
-                        <select class="device-select" id="cameraSelect" style="display: none;">
-                            <option value="">Выберите камеру</option>
-                        </select>
-                    </div>
-
-                    <div class="control-group">
-                        <button class="control-btn" id="micBtn" title="Микрофон">
-                            <span class="control-icon">🎤</span>
-                        </button>
-                        <select class="device-select" id="micSelect" style="display: none;">
-                            <option value="">Выберите микрофон</option>
-                        </select>
-                    </div>
-
-                    <div class="control-group">
-                        <button class="control-btn" id="screenShareBtn" title="Демонстрация экрана">
-                            <span class="control-icon">🖥️</span>
-                        </button>
-                    </div>
-
-                    <button class="hangup-btn" id="hangupBtn">
-                        <span class="hangup-icon">📞</span>
-                        Сбросить
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Settings Modal -->
     <div class="modal" id="settingsModal" style="display: none;">
         <div class="modal-content settings-modal-content">
@@ -450,7 +389,6 @@
     <script src="script.js"></script>
     <script src="auth.js"></script>
     <script src="chat.js"></script>
-    <script src="calls.js"></script>
     <script src="ui.js"></script>
 </body>
 </html>
