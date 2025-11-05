@@ -1,404 +1,353 @@
-// UI Module - Additional UI functionality
+// UI Module - Handles UI enhancements and interactions
 
 // DOM Elements
 const settingsBtn = document.getElementById('settingsBtn');
-const searchInput = document.getElementById('searchInput');
-
-// Search Functionality
-function initSearch() {
-    let searchTimeout;
-
-    searchInput.addEventListener('input', (e) => {
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(() => {
-            const query = e.target.value.toLowerCase().trim();
-            filterChats(query);
-        }, 300);
-    });
-}
-
-// Filter Chats
-function filterChats(query) {
-    const chatItems = document.querySelectorAll('.chat-item');
-
-    if (!query) {
-        chatItems.forEach(item => {
-            item.style.display = 'flex';
-        });
-        return;
-    }
-
-    chatItems.forEach(item => {
-        const chatName = item.querySelector('.chat-name').textContent.toLowerCase();
-        const lastMessage = item.querySelector('.chat-last-message').textContent.toLowerCase();
-
-        if (chatName.includes(query) || lastMessage.includes(query)) {
-            item.style.display = 'flex';
-        } else {
-            item.style.display = 'none';
-        }
-    });
-}
-
-// Settings Menu
-function initSettings() {
-    settingsBtn.addEventListener('click', showSettingsMenu);
-}
-
-// Show Settings Menu
-function showSettingsMenu() {
-    // Create settings menu
-    const settingsMenu = document.createElement('div');
-    settingsMenu.className = 'settings-menu';
-    settingsMenu.innerHTML = `
-        <div class="settings-item" id="changeAvatarBtn">
-            <span>📷 Изменить аватарку</span>
-        </div>
-        <div class="settings-item" id="themeToggle">
-            <span>🌙 Темная тема</span>
-            <label class="switch">
-                <input type="checkbox" id="themeSwitch">
-                <span class="slider"></span>
-            </label>
-        </div>
-        <div class="settings-item" id="logoutBtn">
-            <span>🚪 Выйти</span>
-        </div>
-    `;
-
-    // Position menu
-    const rect = settingsBtn.getBoundingClientRect();
-    settingsMenu.style.position = 'absolute';
-    settingsMenu.style.top = rect.bottom + 10 + 'px';
-    settingsMenu.style.right = '15px';
-    settingsMenu.style.zIndex = '1000';
-
-    // Add to DOM
-    document.body.appendChild(settingsMenu);
-
-    // Setup event listeners
-    setupSettingsMenu(settingsMenu);
-
-    // Close on outside click
-    setTimeout(() => {
-        document.addEventListener('click', function closeMenu(e) {
-            if (!settingsMenu.contains(e.target) && e.target !== settingsBtn) {
-                settingsMenu.remove();
-                document.removeEventListener('click', closeMenu);
-            }
-        });
-    }, 100);
-}
-
-// Setup Settings Menu
-function setupSettingsMenu(menu) {
-    const changeAvatarBtn = menu.querySelector('#changeAvatarBtn');
-    const themeToggle = menu.querySelector('#themeToggle');
-    const themeSwitch = menu.querySelector('#themeSwitch');
-    const logoutBtn = menu.querySelector('#logoutBtn');
-
-    // Load current theme
-    const isDark = document.body.classList.contains('dark-theme');
-    themeSwitch.checked = isDark;
-
-    // Theme toggle
-    themeToggle.addEventListener('click', (e) => {
-        if (e.target === themeSwitch) return; // Don't toggle twice
-        themeSwitch.checked = !themeSwitch.checked;
-        toggleTheme();
-    });
-
-    // Change Avatar
-    changeAvatarBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        console.log('Avatar button clicked');
-
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*';
-        input.style.display = 'none';
-        input.multiple = false;
-
-        input.onchange = async (event) => {
-            console.log('File selected:', event.target.files[0]);
-            const file = event.target.files[0];
-            if (file) {
-                try {
-                    await uploadAvatar(file);
-                } catch (error) {
-                    console.error('Avatar upload failed:', error);
-                    showNotification('Ошибка загрузки аватарки', 'error');
-                }
-            }
-            if (input.parentNode) {
-                input.parentNode.removeChild(input);
-            }
-        };
-
-        // Add to body and trigger
-        document.body.appendChild(input);
-        setTimeout(() => {
-            input.click();
-        }, 10);
-
-        menu.remove();
-    });
-
-    themeSwitch.addEventListener('change', toggleTheme);
-
-    // Logout
-    logoutBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (confirm('Вы уверены, что хотите выйти?')) {
-            window.logoutUser().then(() => {
-                // Force redirect to auth screen
-                const authScreen = document.getElementById('authScreen');
-                const app = document.getElementById('app');
-                if (authScreen && app) {
-                    authScreen.style.display = 'flex';
-                    app.style.display = 'none';
-                }
-            }).catch((error) => {
-                console.error('Logout error:', error);
-                showNotification('Ошибка при выходе', 'error');
-            });
-        }
-        menu.remove();
-    });
-}
-
-// Toggle Theme
-function toggleTheme() {
-    document.body.classList.toggle('dark-theme');
-    const isDark = document.body.classList.contains('dark-theme');
-
-    // Save theme preference
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
-
-    // Update theme switch if exists
-    const themeSwitch = document.getElementById('themeSwitch');
-    if (themeSwitch) {
-        themeSwitch.checked = isDark;
-    }
-}
-
-// Load Saved Theme
-function loadSavedTheme() {
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'dark') {
-        document.body.classList.add('dark-theme');
-    }
-}
-
-// Mobile Responsiveness
-function initMobile() {
-    // Prevent zoom on input focus for iOS
-    const inputs = document.querySelectorAll('input, textarea');
-    inputs.forEach(input => {
-        input.addEventListener('focus', () => {
-            if (window.innerWidth <= 768) {
-                // Small delay to ensure viewport is set
-                setTimeout(() => {
-                    const viewport = document.querySelector('meta[name=viewport]');
-                    if (viewport) {
-                        viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
-                    }
-                }, 100);
-            }
-        });
-
-        input.addEventListener('blur', () => {
-            if (window.innerWidth <= 768) {
-                const viewport = document.querySelector('meta[name=viewport]');
-                if (viewport) {
-                    viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
-                }
-            }
-        });
-    });
-
-    // Handle orientation changes
-    window.addEventListener('orientationchange', () => {
-        setTimeout(() => {
-            // Recalculate heights after orientation change
-            const vh = window.innerHeight * 0.01;
-            document.documentElement.style.setProperty('--vh', `${vh}px`);
-        }, 100);
-    });
-
-    // Set CSS custom property for mobile height
-    function setMobileHeight() {
-        const vh = window.innerHeight * 0.01;
-        document.documentElement.style.setProperty('--vh', `${vh}px`);
-    }
-
-    setMobileHeight();
-    window.addEventListener('resize', setMobileHeight);
-
-    // Improve touch interactions
-    const chatItems = document.querySelectorAll('.chat-item');
-    chatItems.forEach(item => {
-        item.addEventListener('touchstart', () => {
-            item.style.background = 'rgba(99, 102, 241, 0.1)';
-        });
-
-        item.addEventListener('touchend', () => {
-            setTimeout(() => {
-                item.style.background = '';
-            }, 150);
-        });
-    });
-
-    // Prevent double-tap zoom
-    let lastTouchEnd = 0;
-    document.addEventListener('touchend', (event) => {
-        const now = Date.now();
-        if (now - lastTouchEnd <= 300) {
-            event.preventDefault();
-        }
-        lastTouchEnd = now;
-    }, false);
-}
-
-// Typing Indicator
-function showTypingIndicator(chatId) {
-    const existingIndicator = document.querySelector('.typing-indicator');
-    if (existingIndicator) {
-        existingIndicator.remove();
-    }
-
-    const indicator = document.createElement('div');
-    indicator.className = 'typing-indicator';
-    indicator.innerHTML = `
-        <span>печатает</span>
-        <div class="typing-dots">
-            <span></span>
-            <span></span>
-            <span></span>
-        </div>
-    `;
-
-    document.getElementById('messagesContainer').appendChild(indicator);
-    scrollToBottom();
-}
-
-function hideTypingIndicator() {
-    const indicator = document.querySelector('.typing-indicator');
-    if (indicator) {
-        indicator.remove();
-    }
-}
-
-// Scroll to Bottom
-function scrollToBottom() {
-    const messagesContainer = document.getElementById('messagesContainer');
-    setTimeout(() => {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    }, 100);
-}
-
-// Notification System
-function showNotification(message, type = 'info') {
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    notification.textContent = message;
-
-    document.body.appendChild(notification);
-
-    // Animate in
-    setTimeout(() => {
-        notification.classList.add('show');
-    }, 100);
-
-    // Auto remove
-    setTimeout(() => {
-        notification.classList.remove('show');
-        setTimeout(() => notification.remove(), 300);
-    }, 3000);
-}
-
-// Loading State
-function showLoading(element, text = 'Загрузка...') {
-    element.innerHTML = `<div class="loading"></div> <span>${text}</span>`;
-    element.disabled = true;
-}
-
-function hideLoading(element, originalText) {
-    element.innerHTML = originalText;
-    element.disabled = false;
-}
+const userAvatar = document.getElementById('userAvatar');
+const userDisplayName = document.getElementById('userDisplayName');
 
 // Initialize UI
 function initUI() {
-    initSearch();
-    initSettings();
-    initMobile();
-    loadSavedTheme();
+    setupUIEventListeners();
+    updateUserProfile();
 }
 
-// Upload Avatar
-async function uploadAvatar(file) {
-    if (!window.currentUser()) {
-        showNotification('Сначала войдите в аккаунт', 'error');
-        return;
+// Setup UI Event Listeners
+function setupUIEventListeners() {
+    // Settings button
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', showSettings);
     }
 
-    // Validate file
+    // User avatar click
+    if (userAvatar) {
+        userAvatar.addEventListener('click', handleAvatarClick);
+    }
+
+    // FAQ button
+    const faqBtn = document.getElementById('faqBtn');
+    const faqModal = document.getElementById('faqModal');
+    const closeFaqModal = document.getElementById('closeFaqModal');
+
+    if (faqBtn) {
+        faqBtn.addEventListener('click', () => {
+            faqModal.style.display = 'flex';
+        });
+    }
+
+    if (closeFaqModal) {
+        closeFaqModal.addEventListener('click', () => {
+            faqModal.style.display = 'none';
+        });
+    }
+
+    if (faqModal) {
+        faqModal.addEventListener('click', (e) => {
+            if (e.target === faqModal) {
+                faqModal.style.display = 'none';
+            }
+        });
+    }
+
+    // Handle window resize for responsive design
+    window.addEventListener('resize', handleResize);
+
+    // Handle mobile sidebar
+    setupMobileSidebar();
+}
+
+// Update User Profile in UI
+function updateUserProfile() {
+    if (!window.getCurrentUser()) return;
+
+    const user = window.getCurrentUser();
+    const userData = getUserData(user.uid);
+
+    if (userDisplayName) {
+        userDisplayName.textContent = userData?.displayName || userData?.username || 'Пользователь';
+    }
+
+    if (userAvatar) {
+        const avatarUrl = userData?.avatar || getDefaultAvatar(userData?.displayName || userData?.username || 'U');
+        userAvatar.src = avatarUrl;
+    }
+}
+
+// Get User Data from Cache
+function getUserData(userId) {
+    // This would be implemented to get user data from the users Map in chat.js
+    // For now, return basic user info
+    return {
+        uid: userId,
+        displayName: window.getCurrentUser()?.displayName || 'Пользователь',
+        avatar: null
+    };
+}
+
+// Generate Default Avatar
+function getDefaultAvatar(username) {
+    const initial = username.charAt(0).toUpperCase();
+    return `data:image/svg+xml;base64,${btoa(`
+        <svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="50" cy="50" r="50" fill="#667eea"/>
+            <text x="50" y="65" text-anchor="middle" fill="white" font-size="40" font-family="Arial, sans-serif">${initial}</text>
+        </svg>
+    `)}`;
+}
+
+// Handle Avatar Click
+function handleAvatarClick() {
+    // Create file input for avatar upload
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = handleAvatarUpload;
+    input.click();
+}
+
+// Handle Avatar Upload
+async function handleAvatarUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type
     if (!file.type.startsWith('image/')) {
-        showNotification('Пожалуйста, выберите изображение', 'error');
+        window.showNotification('Пожалуйста, выберите изображение', 'error');
         return;
     }
 
-    if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        showNotification('Файл слишком большой. Максимальный размер: 5MB', 'error');
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+        window.showNotification('Размер файла не должен превышать 5MB', 'error');
         return;
     }
 
     try {
-        showNotification('Загрузка аватарки...', 'info');
+        const user = window.getCurrentUser();
+        if (!user) return;
 
-        // Convert file to base64 for local storage (since Firebase Storage has CORS issues on GitHub Pages)
-        const base64String = await fileToBase64(file);
+        // Show loading
+        window.showNotification('Загрузка аватара...', 'info');
 
-        // Update user profile in database with base64 data
-        await window.update(window.dbRef(window.database, `users/${window.currentUser().uid}`), {
-            avatar: base64String
+        // Upload to Firebase Storage
+        const storageRef = window.storageRef(window.storage, `avatars/${user.uid}`);
+        const snapshot = await window.uploadBytes(storageRef, file);
+        const downloadURL = await window.getDownloadURL(snapshot.ref);
+
+        // Update user profile
+        await window.update(window.dbRef(window.database, `users/${user.uid}`), {
+            avatar: downloadURL
         });
 
-        // Update local avatar display immediately
-        const userAvatar = document.getElementById('userAvatar');
-        if (userAvatar) {
-            userAvatar.src = base64String;
-        }
+        // Update UI
+        userAvatar.src = downloadURL;
 
-        showNotification('Аватарка успешно обновлена!', 'success');
+        window.showNotification('Аватар обновлен', 'success');
 
     } catch (error) {
-        console.error('Error uploading avatar:', error);
-        showNotification('Ошибка загрузки аватарки', 'error');
+        console.error('Avatar upload error:', error);
+        window.showNotification('Ошибка загрузки аватара', 'error');
     }
 }
 
-// Helper function to convert file to base64
-function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = error => reject(error);
+// Show Settings Modal
+function showSettings() {
+    // Create settings modal
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3>Настройки</h3>
+                <button class="close-modal" onclick="this.closest('.modal').remove()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-item">
+                    <label>Отображаемое имя:</label>
+                    <input type="text" id="displayNameInput" class="modal-input" placeholder="Ваше имя">
+                </div>
+                <div class="setting-item" style="margin-top: 20px;">
+                    <button id="saveSettingsBtn" class="modal-btn">Сохранить</button>
+                </div>
+                <div class="setting-item" style="margin-top: 20px;">
+                    <button id="logoutBtn" class="modal-btn" style="background: #f44336;">Выйти</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Fill current values
+    const displayNameInput = modal.querySelector('#displayNameInput');
+    const userData = getUserData(window.getCurrentUser().uid);
+    displayNameInput.value = userData?.displayName || '';
+
+    // Save settings
+    modal.querySelector('#saveSettingsBtn').addEventListener('click', async () => {
+        const newDisplayName = displayNameInput.value.trim();
+        if (!newDisplayName) {
+            window.showNotification('Введите имя', 'error');
+            return;
+        }
+
+        try {
+            await window.update(window.dbRef(window.database, `users/${window.getCurrentUser().uid}`), {
+                displayName: newDisplayName
+            });
+
+            updateUserProfile();
+            modal.remove();
+            window.showNotification('Настройки сохранены', 'success');
+
+        } catch (error) {
+            console.error('Settings save error:', error);
+            window.showNotification('Ошибка сохранения', 'error');
+        }
+    });
+
+    // Logout
+    modal.querySelector('#logoutBtn').addEventListener('click', () => {
+        if (confirm('Вы уверены, что хотите выйти?')) {
+            window.handleLogout();
+            modal.remove();
+        }
+    });
+
+    // Close modal when clicking outside
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.remove();
     });
 }
 
+// Handle Window Resize
+function handleResize() {
+    // Handle responsive design changes
+    const sidebar = document.querySelector('.sidebar');
+    const chatArea = document.querySelector('.chat-area');
+
+    if (window.innerWidth <= 768) {
+        // Mobile layout
+        if (sidebar && chatArea) {
+            sidebar.style.position = 'absolute';
+            sidebar.style.left = '-100%';
+            sidebar.style.transition = 'left 0.3s';
+        }
+    } else {
+        // Desktop layout
+        if (sidebar) {
+            sidebar.style.position = 'static';
+            sidebar.style.left = 'auto';
+        }
+    }
+}
+
+// Setup Mobile Sidebar
+function setupMobileSidebar() {
+    if (window.innerWidth > 768) return;
+
+    const sidebar = document.querySelector('.sidebar');
+    const chatArea = document.querySelector('.chat-area');
+
+    if (!sidebar || !chatArea) return;
+
+    // Add mobile toggle button to chat area
+    const mobileToggle = document.createElement('button');
+    mobileToggle.className = 'mobile-sidebar-toggle';
+    mobileToggle.innerHTML = '☰';
+    mobileToggle.style.cssText = `
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        z-index: 1001;
+        background: #667eea;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        font-size: 18px;
+        cursor: pointer;
+        display: none;
+    `;
+
+    // Show toggle button on mobile
+    if (window.innerWidth <= 768) {
+        mobileToggle.style.display = 'block';
+        chatArea.appendChild(mobileToggle);
+    }
+
+    // Toggle sidebar
+    mobileToggle.addEventListener('click', () => {
+        const isOpen = sidebar.style.left === '0px';
+        sidebar.style.left = isOpen ? '-100%' : '0px';
+    });
+
+    // Close sidebar when clicking on chat area
+    chatArea.addEventListener('click', (e) => {
+        if (e.target === chatArea && sidebar.style.left === '0px') {
+            sidebar.style.left = '-100%';
+        }
+    });
+}
+
+// Show Loading State
+function showLoading(element, text = 'Загрузка...') {
+    if (!element) return;
+
+    element.classList.add('loading');
+    element.style.position = 'relative';
+
+    const loader = document.createElement('div');
+    loader.className = 'loader';
+    loader.innerHTML = `
+        <div class="spinner"></div>
+        <div class="loader-text">${text}</div>
+    `;
+
+    loader.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.9);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+        border-radius: 10px;
+    `;
+
+    element.appendChild(loader);
+}
+
+// Hide Loading State
+function hideLoading(element) {
+    if (!element) return;
+
+    element.classList.remove('loading');
+    const loader = element.querySelector('.loader');
+    if (loader) {
+        loader.remove();
+    }
+}
+
+// Debounce function for performance
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
 // Export functions
-window.showTypingIndicator = showTypingIndicator;
-window.hideTypingIndicator = hideTypingIndicator;
-window.showNotification = showNotification;
+window.initUI = initUI;
+window.updateUserProfile = updateUserProfile;
 window.showLoading = showLoading;
 window.hideLoading = hideLoading;
-
-// Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', initUI);
