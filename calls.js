@@ -511,6 +511,11 @@ function endCall() {
         sendCallSignal('hangup', {
             chatId: currentCall.chatId
         });
+
+        // Clean up call signals in Firebase after a delay
+        setTimeout(() => {
+            cleanupCallSignals(currentCall.chatId);
+        }, 5000); // Clean up after 5 seconds
     }
 
     // Close peer connection
@@ -547,6 +552,75 @@ function endCall() {
 
     currentCall = null;
 }
+
+// Clean up old call signals from Firebase
+function cleanupCallSignals(chatId) {
+    try {
+        const signalsRef = window.dbRef(window.database, `callSignals/${chatId}`);
+        const cutoffTime = Date.now() - (10 * 60 * 1000); // 10 minutes ago
+
+        // Get all signals and remove old ones
+        window.get(signalsRef).then((snapshot) => {
+            const signals = snapshot.val();
+            if (signals) {
+                const deletePromises = [];
+                Object.entries(signals).forEach(([signalId, signalData]) => {
+                    if (signalData.timestamp < cutoffTime) {
+                        deletePromises.push(
+                            window.remove(window.dbRef(window.database, `callSignals/${chatId}/${signalId}`))
+                        );
+                    }
+                });
+
+                if (deletePromises.length > 0) {
+                    Promise.all(deletePromises).then(() => {
+                        console.log(`Cleaned up ${deletePromises.length} old call signals`);
+                    }).catch(error => {
+                        console.error('Error cleaning up call signals:', error);
+                    });
+                }
+            }
+        }).catch(error => {
+            console.error('Error getting call signals for cleanup:', error);
+        });
+    } catch (error) {
+        console.error('Error in cleanupCallSignals:', error);
+    }
+}
+
+// Manual cleanup function for Firebase (call this from console if needed)
+function cleanupAllCallSignals() {
+    console.log('Starting manual cleanup of all call signals...');
+
+    try {
+        // Get all chats
+        const userId = window.currentUser().uid;
+        const userChatsRef = window.dbRef(window.database, `userChats/${userId}`);
+
+        window.get(userChatsRef).then((snapshot) => {
+            const userChats = snapshot.val();
+            if (userChats) {
+                const chatIds = Object.keys(userChats).filter(id => id !== 'global_chat');
+
+                chatIds.forEach(chatId => {
+                    const signalsRef = window.dbRef(window.database, `callSignals/${chatId}`);
+                    window.remove(signalsRef).then(() => {
+                        console.log(`Cleaned up signals for chat: ${chatId}`);
+                    }).catch(error => {
+                        console.error(`Error cleaning up chat ${chatId}:`, error);
+                    });
+                });
+            }
+        }).catch(error => {
+            console.error('Error getting user chats for cleanup:', error);
+        });
+    } catch (error) {
+        console.error('Error in cleanupAllCallSignals:', error);
+    }
+}
+
+// Make function available globally
+window.cleanupAllCallSignals = cleanupAllCallSignals;
 
 // Export functions
 window.initCalls = initCalls;
