@@ -9,7 +9,7 @@ let currentGroupChat = null; // For group chat management
 // Basic initialization without security overhead
 (function() {
     'use strict';
-    console.log('Chat by Fan - Basic initialization');
+    console.log('FansChat - Basic initialization');
 })();
 
 // DOM Elements
@@ -70,7 +70,7 @@ function loadChats() {
         // Load chat details for each chat, excluding global chat
         Object.keys(userChats).forEach(chatId => {
             if (chatId !== 'global_chat') {
-                loadChatDetails(chatId);
+                loadChatDetails(chatId, userChats[chatId]);
             }
         });
 
@@ -82,12 +82,14 @@ function loadChats() {
 }
 
 // Load Chat Details
-function loadChatDetails(chatId) {
+function loadChatDetails(chatId, userChatData) {
     const chatRef = window.dbRef(window.database, `chats/${chatId}`);
 
     window.onValue(chatRef, (snapshot) => {
         const chatData = snapshot.val();
         if (chatData) {
+            // Add pinned status from user chat data
+            chatData.pinned = userChatData && userChatData.pinned === true;
             chats.set(chatId, chatData);
             loadLastMessage(chatId);
             renderChatsList();
@@ -125,8 +127,16 @@ function renderChatsList() {
         return;
     }
 
-    // Sort chats by last message timestamp
+    // Sort chats: pinned first, then by last message timestamp
     const sortedChats = Array.from(chats.entries()).sort((a, b) => {
+        const aPinned = a[1].pinned || false;
+        const bPinned = b[1].pinned || false;
+
+        // Pinned chats come first
+        if (aPinned && !bPinned) return -1;
+        if (!aPinned && bPinned) return 1;
+
+        // Within pinned/unpinned groups, sort by last message timestamp
         const aTime = a[1].lastMessage?.timestamp || 0;
         const bTime = b[1].lastMessage?.timestamp || 0;
         return bTime - aTime;
@@ -175,9 +185,13 @@ function createChatItem(chatId, chatData) {
         showDeleteBtn = true;
     }
 
+    const isPinned = chatData.pinned || false;
+    const pinIcon = isPinned ? '📌' : '📍';
+
     chatItem.innerHTML = `
         <div class="chat-avatar">
             <img src="${chatAvatarSrc}" alt="Avatar">
+            ${isPinned ? '<div class="pinned-indicator" title="Закрепленный чат">📌</div>' : ''}
         </div>
         <div class="chat-content">
             <div class="chat-header-info">
@@ -188,16 +202,28 @@ function createChatItem(chatId, chatData) {
                 ${chatData.lastMessage ? formatLastMessage(chatData.lastMessage) : 'Нет сообщений'}
             </div>
         </div>
-        ${showDeleteBtn ? `<button class="delete-chat-btn" data-chat-id="${chatId}" title="Удалить чат">🗑️</button>` : ''}
+        <div class="chat-actions">
+            <button class="pin-chat-btn ${isPinned ? 'pinned' : ''}" data-chat-id="${chatId}" title="${isPinned ? 'Открепить чат' : 'Закрепить чат'}">${pinIcon}</button>
+            ${showDeleteBtn ? `<button class="delete-chat-btn" data-chat-id="${chatId}" title="Удалить чат">🗑️</button>` : ''}
+        </div>
     `;
 
     chatItem.addEventListener('click', (e) => {
-        // Don't open chat if delete button was clicked
-        if (e.target.classList.contains('delete-chat-btn')) {
+        // Don't open chat if delete or pin button was clicked
+        if (e.target.classList.contains('delete-chat-btn') || e.target.classList.contains('pin-chat-btn')) {
             return;
         }
         openChat(chatId);
     });
+
+    // Add pin button event listener
+    const pinBtn = chatItem.querySelector('.pin-chat-btn');
+    if (pinBtn) {
+        pinBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            togglePinChat(chatId);
+        });
+    }
 
     // Add delete button event listener only for private chats
     if (showDeleteBtn) {
@@ -1151,6 +1177,36 @@ async function deleteChatForUser(chatId) {
     } catch (error) {
         console.error('Error deleting chat for user:', error);
         showNotification('Ошибка удаления чата', 'error');
+    }
+}
+
+// Toggle Pin Chat
+async function togglePinChat(chatId) {
+    try {
+        const currentUserId = window.currentUser().uid;
+        const chatData = chats.get(chatId);
+
+        if (!chatData) return;
+
+        const isCurrentlyPinned = chatData.pinned || false;
+        const newPinnedState = !isCurrentlyPinned;
+
+        // Update in Firebase
+        await window.update(window.dbRef(window.database, `userChats/${currentUserId}/${chatId}`), {
+            pinned: newPinnedState
+        });
+
+        // Update local data
+        chatData.pinned = newPinnedState;
+        chats.set(chatId, chatData);
+
+        // Update UI
+        renderChatsList();
+
+        showNotification(newPinnedState ? 'Чат закреплен' : 'Чат откреплен', 'success');
+    } catch (error) {
+        console.error('Error toggling pin status:', error);
+        showNotification('Ошибка изменения закрепления', 'error');
     }
 }
 
@@ -2382,3 +2438,4 @@ window.changeChannelAvatar = changeChannelAvatar;
 window.deleteMessage = deleteMessage;
 window.editMessage = editMessage;
 window.deleteChatForUser = deleteChatForUser;
+window.togglePinChat = togglePinChat;

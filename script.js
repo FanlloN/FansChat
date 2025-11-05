@@ -54,7 +54,7 @@ console.log('Firebase initialized successfully');
 
 // Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('Chat by Fan initializing...');
+    console.log('FansChat initializing...');
 
     // All initialization is handled by individual modules
     // auth.js handles authentication
