@@ -1670,7 +1670,7 @@ async function createGroupChat() {
         await window.set(window.dbRef(window.database, `chats/${groupId}`), groupData);
 
         // Add to each participant's chat list
-        for (const participantId of participants) {
+        for (const participantId of validParticipants) {
             await window.set(window.dbRef(window.database, `userChats/${participantId}/${groupId}`), true);
         }
 
