@@ -214,26 +214,151 @@
         </div>
     </div>
 
-    <!-- SCRIPTS LOADED IN CORRECT ORDER -->
+    <!-- SCRIPTS LOADED INLINE FOR TESTING -->
     <script>
-        console.log('=== LOADING SCRIPTS ===');
+        console.log('=== LOADING SCRIPTS INLINE ===');
+
+        // Load script.js inline
+        console.log('Loading script.js...');
+        // Copy the entire script.js content here
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('=== DOM CONTENT LOADED ===');
+            console.log('Chat by Fan initializing...');
+
+            // Wait for all scripts to load
+            setTimeout(() => {
+                console.log('Initializing modules after timeout...');
+
+                // Initialize all modules in correct order
+                if (typeof window.initAuth === 'function') {
+                    console.log('Calling initAuth...');
+                    window.initAuth();
+                    console.log('✅ Auth module initialized');
+                } else {
+                    console.error('❌ initAuth function not found');
+                }
+
+                if (typeof window.initUI === 'function') {
+                    console.log('Calling initUI...');
+                    window.initUI();
+                    console.log('✅ UI module initialized');
+                } else {
+                    console.error('❌ initUI function not found');
+                }
+
+                // Chat will be initialized after authentication
+                console.log('✅ All modules loaded successfully');
+            }, 1000); // Wait 1 second for all scripts to load
+        });
+        console.log('script.js loaded inline');
     </script>
-    <script src="script.js"></script>
+
     <script>
-        console.log('script.js loaded');
+        // Load auth.js inline
+        console.log('Loading auth.js...');
+        // Copy auth.js content here
+        let currentUser = null;
+
+        const authScreenElement = document.getElementById('authScreen');
+        const appElement = document.getElementById('app');
+        const loginFormElement = document.getElementById('loginForm');
+        const registerFormElement = document.getElementById('registerForm');
+        const loginBtnElement = document.getElementById('loginBtn');
+        const registerBtnElement = document.getElementById('registerBtn');
+        const showRegisterElement = document.getElementById('showRegister');
+        const showLoginElement = document.getElementById('showLogin');
+        const loginUsernameElement = document.getElementById('loginUsername');
+        const loginPasswordElement = document.getElementById('loginPassword');
+        const registerUsernameElement = document.getElementById('registerUsername');
+        const registerPasswordElement = document.getElementById('registerPassword');
+
+        function initAuth() {
+            console.log('=== INIT AUTH START ===');
+
+            if (!window.auth || !window.database) {
+                console.error('❌ Firebase not loaded!');
+                return;
+            }
+
+            console.log('✅ Firebase is available');
+
+            window.onAuthStateChanged(window.auth, (user) => {
+                console.log('🔄 Auth state changed:', user ? 'logged in' : 'logged out');
+                if (user) {
+                    currentUser = user;
+                    console.log('👤 User logged in:', user.uid);
+                    if (authScreenElement && appElement) {
+                        authScreenElement.style.display = 'none';
+                        appElement.style.display = 'flex';
+                    }
+                } else {
+                    currentUser = null;
+                    console.log('🚪 User logged out');
+                    if (authScreenElement && appElement) {
+                        authScreenElement.style.display = 'flex';
+                        appElement.style.display = 'none';
+                    }
+                }
+            });
+
+            console.log('🎧 Setting up event listeners...');
+            setupEventListeners();
+            console.log('✅ Auth initialization complete');
+        }
+
+        function setupEventListeners() {
+            console.log('🎧 Setting up auth event listeners...');
+
+            if (loginBtnElement) {
+                loginBtnElement.addEventListener('click', (e) => {
+                    console.log('🔵 Login button clicked');
+                    e.preventDefault();
+                    handleLogin();
+                });
+                console.log('✅ Login button listener added');
+            } else {
+                console.error('❌ loginBtnElement not found!');
+            }
+
+            if (registerBtnElement) {
+                registerBtnElement.addEventListener('click', (e) => {
+                    console.log('🟢 Register button clicked');
+                    e.preventDefault();
+                    handleRegister();
+                });
+                console.log('✅ Register button listener added');
+            } else {
+                console.error('❌ registerBtnElement not found!');
+            }
+
+            console.log('✅ Auth event listeners setup complete');
+        }
+
+        function handleLogin() {
+            console.log('🚪 Handling login...');
+            alert('Login function called!');
+        }
+
+        function handleRegister() {
+            console.log('📝 Handling register...');
+            alert('Register function called!');
+        }
+
+        window.initAuth = initAuth;
+        console.log('auth.js loaded inline');
     </script>
-    <script src="auth.js"></script>
+
     <script>
-        console.log('auth.js loaded');
-    </script>
-    <script src="chat.js"></script>
-    <script>
-        console.log('chat.js loaded');
-    </script>
-    <script src="ui.js"></script>
-    <script>
-        console.log('ui.js loaded');
-        console.log('=== ALL SCRIPTS LOADED ===');
+        // Load ui.js inline
+        console.log('Loading ui.js...');
+
+        function initUI() {
+            console.log('Initializing UI module...');
+            console.log('UI module initialized successfully');
+        }
+
+        window.initUI = initUI;
+        console.log('ui.js loaded inline');
     </script>
 
     <!-- Emergency test buttons -->
