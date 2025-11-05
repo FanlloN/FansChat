@@ -71,6 +71,13 @@ function hideFAQModal() {
 
 // Show Settings Menu
 function showSettingsMenu() {
+    // Check if menu is already open, if so, close it
+    const existingMenu = document.querySelector('.settings-menu');
+    if (existingMenu) {
+        existingMenu.remove();
+        return;
+    }
+
     // Create settings menu
     const settingsMenu = document.createElement('div');
     settingsMenu.className = 'settings-menu';
@@ -372,14 +379,28 @@ async function uploadAvatar(file) {
         return;
     }
 
-    // Validate file
-    if (!file.type.startsWith('image/')) {
-        showNotification('Пожалуйста, выберите изображение', 'error');
+    // Security: Rate limiting for uploads
+    if (!checkRateLimit('upload_' + window.currentUser().uid)) {
+        showNotification('Слишком много загрузок. Попробуйте позже.', 'error');
         return;
     }
 
-    if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        showNotification('Файл слишком большой. Максимальный размер: 5MB', 'error');
+    // Security: File type validation
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+        showNotification('Недопустимый тип файла. Разрешены только JPEG, PNG, GIF, WebP', 'error');
+        return;
+    }
+
+    // Security: File size validation
+    if (file.size > 2 * 1024 * 1024) { // 2MB limit
+        showNotification('Файл слишком большой. Максимальный размер: 2MB', 'error');
+        return;
+    }
+
+    // Security: File name validation
+    if (file.name.length > 100 || /[<>:;"'|?*\x00-\x1f]/.test(file.name)) {
+        showNotification('Недопустимое имя файла', 'error');
         return;
     }
 
@@ -408,15 +429,98 @@ async function uploadAvatar(file) {
     }
 }
 
-// Helper function to convert file to base64
+// Helper function to convert file to base64 with security checks
 function fileToBase64(file) {
     return new Promise((resolve, reject) => {
+        // Security: Double-check file type and size
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        if (!allowedTypes.includes(file.type)) {
+            reject(new Error('Invalid file type'));
+            return;
+        }
+
+        if (file.size > 2 * 1024 * 1024) { // 2MB limit
+            reject(new Error('File too large'));
+            return;
+        }
+
         const reader = new FileReader();
+
+        // Security: Add timeout
+        const timeout = setTimeout(() => {
+            reader.abort();
+            reject(new Error('File read timeout'));
+        }, 30000); // 30 second timeout
+
+        reader.onload = () => {
+            clearTimeout(timeout);
+            const result = reader.result;
+            // Security: Validate base64 format
+            if (typeof result === 'string' && result.startsWith('data:image/')) {
+                resolve(result);
+            } else {
+                reject(new Error('Invalid file content'));
+            }
+        };
+
+        reader.onerror = () => {
+            clearTimeout(timeout);
+            reject(new Error('File read error'));
+        };
+
         reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = error => reject(error);
     });
 }
+
+// Security: Override dangerous DOM methods
+const originalSetAttribute = Element.prototype.setAttribute;
+Element.prototype.setAttribute = function(name, value) {
+    // Prevent setting dangerous attributes
+    if (name.toLowerCase().startsWith('on') || name.toLowerCase() === 'src' && typeof value === 'string' && value.startsWith('javascript:')) {
+        console.warn('Blocked dangerous attribute:', name);
+        return;
+    }
+    return originalSetAttribute.call(this, name, value);
+};
+
+// Security: Monitor for suspicious activity
+let suspiciousActivityCount = 0;
+const monitorInterval = setInterval(() => {
+    // Reset counter periodically
+    suspiciousActivityCount = Math.max(0, suspiciousActivityCount - 1);
+}, 60000); // Every minute
+
+function reportSuspiciousActivity(type) {
+    suspiciousActivityCount++;
+    console.warn('Suspicious activity detected:', type, 'Count:', suspiciousActivityCount);
+
+    if (suspiciousActivityCount > 10) {
+        // Too much suspicious activity, log out user
+        console.error('Too much suspicious activity, logging out...');
+        if (window.logoutUser) {
+            window.logoutUser();
+        }
+    }
+}
+
+// Security: Monitor DOM manipulation
+const originalAppendChild = Node.prototype.appendChild;
+Node.prototype.appendChild = function(child) {
+    if (child.tagName && child.tagName.toLowerCase() === 'script') {
+        reportSuspiciousActivity('script_injection_attempt');
+        return child; // Don't append
+    }
+    return originalAppendChild.call(this, child);
+};
+
+// Security: Monitor XMLHttpRequest
+const originalOpen = XMLHttpRequest.prototype.open;
+XMLHttpRequest.prototype.open = function(method, url) {
+    if (typeof url === 'string' && !url.startsWith(window.location.origin) && !url.includes('firebase')) {
+        reportSuspiciousActivity('external_request_attempt');
+    }
+    return originalOpen.call(this, method, url);
+};
 
 // Export functions
 window.showTypingIndicator = showTypingIndicator;

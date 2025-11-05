@@ -220,9 +220,16 @@ function createMessageElement(messageId, messageData) {
     const isOwn = messageData.sender === window.currentUser().uid;
     messageDiv.className = `message ${isOwn ? 'own' : 'other'}`;
 
-    // Load sender info if not cached
+    // Security: Don't load or display info for unknown users
     if (!users.has(messageData.sender)) {
-        loadUserInfo(messageData.sender);
+        // Only load user info if it's a participant in current chat
+        const currentChatData = currentChat?.data;
+        if (currentChatData?.participants?.includes(messageData.sender)) {
+            loadUserInfo(messageData.sender);
+        } else {
+            // Don't display messages from non-participants
+            return document.createElement('div');
+        }
     }
 
     const sender = users.get(messageData.sender);
@@ -234,17 +241,18 @@ function createMessageElement(messageId, messageData) {
         (users.get(window.currentUser().uid)?.avatar || defaultAvatar) :
         (sender?.avatar || defaultAvatar);
 
-    console.log('Avatar src for', isOwn ? 'own' : 'other', 'message:', avatarSrc);
-
     const senderName = isOwn ?
         (users.get(window.currentUser().uid)?.displayName || users.get(window.currentUser().uid)?.username || 'Вы') :
         (sender?.displayName || sender?.username || 'Неизвестный');
+
+    // Security: Sanitize message content before display
+    const safeMessageText = sanitizeInput(messageData.text);
 
     messageDiv.innerHTML = `
         ${!isOwn ? `<div class="message-avatar"><img src="${avatarSrc}" alt="Avatar"></div>` : ''}
         <div class="message-content">
             ${!isOwn ? `<div class="message-sender">${senderName}</div>` : ''}
-            <div class="message-bubble">${messageData.text}</div>
+            <div class="message-bubble">${safeMessageText}</div>
             <div class="message-time">${time}</div>
         </div>
         ${isOwn ? `<div class="message-avatar"><img src="${avatarSrc}" alt="Avatar"></div>` : ''}
@@ -258,8 +266,27 @@ async function sendMessage() {
     const text = messageInput.value.trim();
     if (!text || !currentChat) return;
 
+    // Security: Rate limiting for messages
+    if (!checkRateLimit('message_' + window.currentUser().uid)) {
+        showNotification('Слишком много сообщений. Подождите немного.', 'error');
+        return;
+    }
+
+    // Security: Message length validation
+    if (text.length > 1000) {
+        showNotification('Сообщение слишком длинное (макс. 1000 символов)', 'error');
+        return;
+    }
+
+    // Security: XSS protection
+    const sanitizedText = sanitizeInput(text);
+    if (sanitizedText !== text) {
+        showNotification('Сообщение содержит недопустимый контент', 'error');
+        return;
+    }
+
     const messageData = {
-        text: text,
+        text: sanitizedText,
         sender: window.currentUser().uid,
         timestamp: Date.now(),
         status: 'sent'
@@ -291,6 +318,18 @@ async function startNewChat() {
         return;
     }
 
+    // Security: Rate limiting for chat creation
+    if (!checkRateLimit('newchat_' + window.currentUser().uid)) {
+        showNotification('Слишком много попыток создания чатов. Попробуйте позже.', 'error');
+        return;
+    }
+
+    // Security: Username validation
+    if (username.length > 50 || !/^[a-zA-Z0-9_]+$/.test(username)) {
+        showNotification('Неверный формат никнейма', 'error');
+        return;
+    }
+
     try {
         // Find user by username
         const usersRef = window.dbRef(window.database, 'users');
@@ -299,7 +338,7 @@ async function startNewChat() {
 
         let targetUserId = null;
         for (const [userId, userData] of Object.entries(usersData || {})) {
-            if (userData.username === username || userData.displayName === username) {
+            if (userData.username === username.toLowerCase() || userData.displayName === username) {
                 targetUserId = userId;
                 break;
             }

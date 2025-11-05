@@ -938,6 +938,11 @@ body.dark-theme .modal-header {
     min-width: 200px;
     z-index: 1000;
     overflow: hidden;
+    transition: background 0.3s ease;
+}
+
+body.dark-theme .settings-menu {
+    background: rgba(30, 58, 138, 0.95);
 }
 
 .settings-item {
