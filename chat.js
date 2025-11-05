@@ -5,117 +5,10 @@ let messages = new Map();
 let users = new Map();
 let replyToMessageId = null;
 
-// Anti-debugging and code protection
+// Basic initialization without security overhead
 (function() {
     'use strict';
-
-    // Detect developer tools
-    let devtoolsOpen = false;
-    const threshold = 160;
-
-    const detectDevTools = () => {
-        if (window.outerHeight - window.innerHeight > threshold || window.outerWidth - window.innerWidth > threshold) {
-            if (!devtoolsOpen) {
-                devtoolsOpen = true;
-                window.securityCore.triggerSecurityAlert('DEVTOOLS_DETECTED', {
-                    outerHeight: window.outerHeight,
-                    innerHeight: window.innerHeight,
-                    outerWidth: window.outerWidth,
-                    innerWidth: window.innerWidth
-                });
-            }
-        } else {
-            devtoolsOpen = false;
-        }
-    };
-
-    // Check for dev tools periodically
-    setInterval(detectDevTools, 500);
-
-    // Disable right-click context menu
-    document.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        window.securityCore.triggerSecurityAlert('RIGHT_CLICK_ATTEMPT');
-        return false;
-    });
-
-    // Allow F12 for debugging, block other dangerous shortcuts
-    document.addEventListener('keydown', (e) => {
-        // Allow F12 to open console for debugging
-        if (e.key === 'F12') {
-            // Allow F12 but log it
-            window.securityCore.triggerSecurityAlert('F12_CONSOLE_OPENED', {
-                timestamp: Date.now(),
-                userAgent: navigator.userAgent
-            });
-            return true; // Allow the event
-        }
-
-        // Block other dangerous shortcuts
-        if (
-            (e.ctrlKey && e.shiftKey && e.key === 'I') ||
-            (e.ctrlKey && e.shiftKey && e.key === 'J') ||
-            (e.ctrlKey && e.shiftKey && e.key === 'C') ||
-            (e.ctrlKey && e.key === 'U') ||
-            (e.ctrlKey && e.key === 'S')
-        ) {
-            e.preventDefault();
-            window.securityCore.triggerSecurityAlert('KEYBOARD_SHORTCUT_BLOCKED', {
-                key: e.key,
-                ctrlKey: e.ctrlKey,
-                shiftKey: e.shiftKey
-            });
-            return false;
-        }
-    });
-
-    // Detect source code viewing attempts
-    const originalToString = Function.prototype.toString;
-    Function.prototype.toString = function() {
-        window.securityCore.triggerSecurityAlert('FUNCTION_TOSTRING_ATTEMPT');
-        return originalToString.apply(this, arguments);
-    };
-
-    // Obfuscate console methods but allow normal debugging
-    const originalLog = console.log;
-    const originalWarn = console.warn;
-    const originalError = console.error;
-
-    console.log = function(...args) {
-        // Only log if it's not a normal application message
-        if (args.length > 0 && typeof args[0] === 'string' && !args[0].includes('Chat initialized')) {
-            window.securityCore.triggerSecurityAlert('CONSOLE_LOG_ATTEMPT', { args: args.join(' ') });
-        }
-        return originalLog.apply(console, args);
-    };
-
-    console.warn = function(...args) {
-        // Completely disable security alerts for console.warn to prevent recursion
-        return originalWarn.apply(console, args);
-    };
-
-    console.error = function(...args) {
-        // Allow errors but log them
-        window.securityCore.triggerSecurityAlert('CONSOLE_ERROR_ATTEMPT', { args: args.join(' ') });
-        return originalError.apply(console, args);
-    };
-
-    // Code integrity check
-    const codeIntegrityCheck = () => {
-        const currentTime = Date.now();
-        const timeDiff = currentTime - window.securityCore.initTime;
-
-        if (timeDiff > 300000) { // 5 minutes
-            if (!window.securityCore.verifyIntegrity()) {
-                window.securityCore.triggerSecurityAlert('CODE_INTEGRITY_VIOLATION');
-                // In production, this would redirect or disable functionality
-                console.warn('Code integrity check failed');
-            }
-        }
-    };
-
-    setInterval(codeIntegrityCheck, 60000); // Check every minute
-
+    console.log('Chat by Fan - Basic initialization');
 })();
 
 // DOM Elements
@@ -1424,26 +1317,8 @@ function cancelReply() {
 
 // Initialize Security Monitoring
 function initSecurityMonitoring() {
-    // Basic monitoring for suspicious DOM manipulation
-    const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-            if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-                mutation.addedNodes.forEach((node) => {
-                    if (node.nodeType === Node.ELEMENT_NODE) {
-                        const tagName = node.tagName.toLowerCase();
-                        if (tagName === 'script' || tagName === 'iframe' || tagName === 'object') {
-                            console.warn('Suspicious DOM manipulation detected:', tagName);
-                        }
-                    }
-                });
-            }
-        });
-    });
-
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true
-    });
+    // Disabled security monitoring to prevent CSP issues
+    console.log('Security monitoring disabled for compatibility');
 }
 
 // Start Image Compression Scheduler
