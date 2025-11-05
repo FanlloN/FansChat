@@ -204,7 +204,7 @@ function createChatItem(chatId, chatData) {
         const deleteBtn = chatItem.querySelector('.delete-chat-btn');
         deleteBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            deleteChat(chatId);
+            deleteChatForUser(chatId);
         });
     }
 
@@ -372,6 +372,8 @@ function createImageGroupElement(messageGroup) {
                 </div>
                 <div class="message-actions">
                     <button class="reply-btn" onclick="replyToMessage('${messageGroup[0][0]}')" title="Ответить">↩️</button>
+                    ${isOwn && chatData.type !== 'channel' ? `<button class="edit-btn" onclick="editMessage('${messageGroup[0][0]}')" title="Редактировать">✏️</button>` : ''}
+                    ${chatData.type !== 'channel' ? `<button class="delete-btn" onclick="deleteMessage('${messageGroup[0][0]}')" title="Удалить">🗑️</button>` : ''}
                 </div>
             </div>
             <div class="message-time">${time}</div>
@@ -454,8 +456,10 @@ function createMessageElement(messageId, messageData) {
         `;
     } else if (messageData.type === 'clear_chat_request') {
         messageContent = `<div class="message-text system-message">${messageData.text}</div>`;
+    } else if (messageData.type === 'system') {
+        messageContent = `<div class="message-text system-message">${messageData.text}</div>`;
     } else {
-        messageContent = `<div class="message-text">${messageData.text}</div>`;
+        messageContent = `<div class="message-text">${messageData.text}${messageData.edited ? ' <span class="edited-indicator" title="Отредактировано">(изменено)</span>' : ''}</div>`;
     }
 
     messageDiv.innerHTML = `
@@ -467,6 +471,8 @@ function createMessageElement(messageId, messageData) {
                 ${messageContent}
                 <div class="message-actions">
                     <button class="reply-btn" onclick="replyToMessage('${messageId}')" title="Ответить">↩️</button>
+                    ${isOwn && chatData.type !== 'channel' ? `<button class="edit-btn" onclick="editMessage('${messageId}')" title="Редактировать">✏️</button>` : ''}
+                    ${chatData.type !== 'channel' ? `<button class="delete-btn" onclick="deleteMessage('${messageId}')" title="Удалить">🗑️</button>` : ''}
                 </div>
             </div>
             <div class="message-time">${time}</div>
@@ -1092,6 +1098,58 @@ async function deleteChat(chatId) {
         showNotification('Чат удален', 'success');
     } catch (error) {
         console.error('Error deleting chat:', error);
+        showNotification('Ошибка удаления чата', 'error');
+    }
+}
+
+// Delete Chat For User (only for this user)
+async function deleteChatForUser(chatId) {
+    if (!confirm('Вы уверены, что хотите удалить этот чат только у себя? Другой участник сможет продолжить видеть сообщения.')) {
+        return;
+    }
+
+    try {
+        const currentUserId = window.currentUser().uid;
+        const chatData = chats.get(chatId);
+
+        if (!chatData) return;
+
+        // Send notification to other participants about chat deletion
+        if (chatData.type !== 'channel') {
+            const otherParticipantId = chatData.participants.find(id => id !== currentUserId);
+            if (otherParticipantId) {
+                const notificationMessage = {
+                    text: `${users.get(currentUserId)?.displayName || users.get(currentUserId)?.username || 'Пользователь'} удалил(а) чат у себя`,
+                    sender: 'system',
+                    timestamp: Date.now(),
+                    status: 'sent',
+                    type: 'system'
+                };
+
+                const messagesRef = window.dbRef(window.database, `messages/${chatId}`);
+                const newMessageRef = window.push(messagesRef);
+                await window.set(newMessageRef, notificationMessage);
+            }
+        }
+
+        // Remove chat from user's chat list
+        await window.remove(window.dbRef(window.database, `userChats/${currentUserId}/${chatId}`));
+
+        // If this chat is currently open, close it
+        if (currentChat && currentChat.id === chatId) {
+            currentChat = null;
+            updateChatUI();
+        }
+
+        // Remove from local chats map
+        chats.delete(chatId);
+
+        // Update UI
+        renderChatsList();
+
+        showNotification('Чат удален у вас', 'success');
+    } catch (error) {
+        console.error('Error deleting chat for user:', error);
         showNotification('Ошибка удаления чата', 'error');
     }
 }
@@ -2166,6 +2224,113 @@ async function changeChannelAvatar() {
     };
 }
 
+// Delete Message
+async function deleteMessage(messageId) {
+    if (!currentChat) return;
+
+    try {
+        const currentUserId = window.currentUser().uid;
+        const messageRef = window.dbRef(window.database, `messages/${currentChat.id}/${messageId}`);
+        const snapshot = await window.get(messageRef);
+        const messageData = snapshot.val();
+
+        if (!messageData) return;
+
+        // Check if user can delete this message
+        if (messageData.sender !== currentUserId && currentChat.data.type === 'channel') {
+            showNotification('Вы можете удалять только свои сообщения', 'error');
+            return;
+        }
+
+        if (!confirm('Вы уверены, что хотите удалить это сообщение?')) {
+            return;
+        }
+
+        await window.remove(messageRef);
+
+        // Update chat last message if this was the last message
+        const messagesRef = window.dbRef(window.database, `messages/${currentChat.id}`);
+        const messagesSnapshot = await window.get(messagesRef);
+        const messages = messagesSnapshot.val() || {};
+
+        const messageKeys = Object.keys(messages);
+        if (messageKeys.length > 0) {
+            const lastMessageKey = messageKeys[messageKeys.length - 1];
+            const lastMessage = messages[lastMessageKey];
+            await window.update(window.dbRef(window.database, `chats/${currentChat.id}`), {
+                lastMessage: lastMessage
+            });
+        } else {
+            await window.update(window.dbRef(window.database, `chats/${currentChat.id}`), {
+                lastMessage: null
+            });
+        }
+
+        showNotification('Сообщение удалено', 'success');
+    } catch (error) {
+        console.error('Error deleting message:', error);
+        showNotification('Ошибка удаления сообщения', 'error');
+    }
+}
+
+// Edit Message
+async function editMessage(messageId) {
+    if (!currentChat) return;
+
+    try {
+        const currentUserId = window.currentUser().uid;
+        const messageRef = window.dbRef(window.database, `messages/${currentChat.id}/${messageId}`);
+        const snapshot = await window.get(messageRef);
+        const messageData = snapshot.val();
+
+        if (!messageData) return;
+
+        // Check if user can edit this message
+        if (messageData.sender !== currentUserId) {
+            showNotification('Вы можете редактировать только свои сообщения', 'error');
+            return;
+        }
+
+        if (messageData.type === 'image') {
+            showNotification('Изображения нельзя редактировать', 'warning');
+            return;
+        }
+
+        const newText = prompt('Введите новый текст сообщения:', messageData.text);
+        if (newText === null || newText.trim() === '') {
+            return;
+        }
+
+        if (newText.length > 2000) {
+            showNotification('Сообщение слишком длинное (максимум 2000 символов)', 'error');
+            return;
+        }
+
+        await window.update(messageRef, {
+            text: newText.trim(),
+            edited: true,
+            editedAt: Date.now()
+        });
+
+        // Update chat last message if this was the last message
+        if (currentChat.data.lastMessage && currentChat.data.lastMessage.timestamp === messageData.timestamp) {
+            await window.update(window.dbRef(window.database, `chats/${currentChat.id}`), {
+                lastMessage: {
+                    ...messageData,
+                    text: newText.trim(),
+                    edited: true,
+                    editedAt: Date.now()
+                }
+            });
+        }
+
+        showNotification('Сообщение отредактировано', 'success');
+    } catch (error) {
+        console.error('Error editing message:', error);
+        showNotification('Ошибка редактирования сообщения', 'error');
+    }
+}
+
 // Update chat rendering for groups and channels
 function updateChatItemForGroup(chatId, chatData) {
     const chatItem = document.querySelector(`[data-chat-id="${chatId}"]`);
@@ -2214,3 +2379,6 @@ window.leaveGroup = leaveGroup;
 window.deleteGroup = deleteGroup;
 window.closeGroupSettingsModal = closeGroupSettingsModal;
 window.changeChannelAvatar = changeChannelAvatar;
+window.deleteMessage = deleteMessage;
+window.editMessage = editMessage;
+window.deleteChatForUser = deleteChatForUser;
