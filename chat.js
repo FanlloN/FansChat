@@ -441,30 +441,86 @@ function updateChatUI() {
 
 // Setup Event Listeners
 function setupEventListeners() {
-    sendBtn.addEventListener('click', sendMessage);
-    messageInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
+    console.log('Setting up chat event listeners...');
+
+    // Check if elements exist
+    console.log('Chat elements check:', {
+        sendBtn: !!sendBtn,
+        messageInput: !!messageInput,
+        newChatBtn: !!newChatBtn,
+        newChatModal: !!newChatModal,
+        closeNewChatModal: !!closeNewChatModal,
+        startNewChatBtn: !!startNewChatBtn,
+        newChatUsername: !!newChatUsername
+    });
+
+    if (sendBtn) {
+        sendBtn.addEventListener('click', (e) => {
+            console.log('Send button clicked');
             sendMessage();
-        }
-    });
+        });
+        console.log('Send button listener added');
+    }
 
+    if (messageInput) {
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                console.log('Enter pressed in message input');
+                sendMessage();
+            }
+        });
+        console.log('Message input listener added');
+    }
 
-    newChatBtn.addEventListener('click', () => {
-        newChatModal.style.display = 'flex';
-    });
+    if (newChatBtn) {
+        newChatBtn.addEventListener('click', () => {
+            console.log('New chat button clicked');
+            if (newChatModal) {
+                newChatModal.style.display = 'flex';
+            }
+        });
+        console.log('New chat button listener added');
+    }
 
-    closeNewChatModal.addEventListener('click', closeModal);
-    startNewChatBtn.addEventListener('click', startNewChat);
+    if (closeNewChatModal) {
+        closeNewChatModal.addEventListener('click', () => {
+            console.log('Close new chat modal clicked');
+            closeModal();
+        });
+        console.log('Close new chat modal listener added');
+    }
 
-    newChatUsername.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') startNewChat();
-    });
+    if (startNewChatBtn) {
+        startNewChatBtn.addEventListener('click', () => {
+            console.log('Start new chat button clicked');
+            startNewChat();
+        });
+        console.log('Start new chat button listener added');
+    }
+
+    if (newChatUsername) {
+        newChatUsername.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                console.log('Enter pressed in new chat username');
+                startNewChat();
+            }
+        });
+        console.log('New chat username listener added');
+    }
 
     // Close modal when clicking outside
-    newChatModal.addEventListener('click', (e) => {
-        if (e.target === newChatModal) closeModal();
-    });
+    if (newChatModal) {
+        newChatModal.addEventListener('click', (e) => {
+            if (e.target === newChatModal) {
+                console.log('New chat modal background clicked');
+                closeModal();
+            }
+        });
+        console.log('New chat modal background listener added');
+    }
+
+    console.log('Chat event listeners setup complete');
 }
 
 // Toggle Emoji Picker

@@ -15,14 +15,26 @@ function initUI() {
 
 // Setup UI Event Listeners
 function setupUIEventListeners() {
+    console.log('Setting up UI event listeners...');
+
     // Settings button
     if (settingsBtn) {
-        settingsBtn.addEventListener('click', showSettings);
+        settingsBtn.addEventListener('click', (e) => {
+            console.log('Settings button clicked');
+            showSettings();
+        });
+        console.log('Settings button listener added');
+    } else {
+        console.error('Settings button not found!');
     }
 
     // User avatar click
     if (userAvatar) {
-        userAvatar.addEventListener('click', handleAvatarClick);
+        userAvatar.addEventListener('click', (e) => {
+            console.log('User avatar clicked');
+            handleAvatarClick();
+        });
+        console.log('User avatar listener added');
     }
 
     // FAQ button
@@ -30,24 +42,40 @@ function setupUIEventListeners() {
     const faqModal = document.getElementById('faqModal');
     const closeFaqModal = document.getElementById('closeFaqModal');
 
+    console.log('FAQ elements found:', {
+        faqBtn: !!faqBtn,
+        faqModal: !!faqModal,
+        closeFaqModal: !!closeFaqModal
+    });
+
     if (faqBtn) {
         faqBtn.addEventListener('click', () => {
-            faqModal.style.display = 'flex';
+            console.log('FAQ button clicked');
+            if (faqModal) {
+                faqModal.style.display = 'flex';
+            }
         });
+        console.log('FAQ button listener added');
     }
 
     if (closeFaqModal) {
         closeFaqModal.addEventListener('click', () => {
-            faqModal.style.display = 'none';
+            console.log('Close FAQ modal clicked');
+            if (faqModal) {
+                faqModal.style.display = 'none';
+            }
         });
+        console.log('Close FAQ modal listener added');
     }
 
     if (faqModal) {
         faqModal.addEventListener('click', (e) => {
             if (e.target === faqModal) {
+                console.log('FAQ modal background clicked');
                 faqModal.style.display = 'none';
             }
         });
+        console.log('FAQ modal background listener added');
     }
 
     // Handle window resize for responsive design
@@ -55,6 +83,8 @@ function setupUIEventListeners() {
 
     // Handle mobile sidebar
     setupMobileSidebar();
+
+    console.log('UI event listeners setup complete');
 }
 
 // Update User Profile in UI
