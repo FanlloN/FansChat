@@ -858,6 +858,12 @@ function updateChatUI() {
         }
     }
 
+    // Hide/show block button based on chat type
+    const blockUserBtn = document.getElementById('blockUserBtn');
+    if (blockUserBtn) {
+        blockUserBtn.style.display = chatData.type === 'private' ? 'inline-block' : 'none';
+    }
+
     if (chatData.type === 'group') {
         // Group chat header
         chatHeader.classList.add('group-chat-header');
@@ -951,7 +957,7 @@ function updateReplyInput() {
     }
 }
 
-// Block User Function (with confirmation request)
+// Block User Function (unilateral blocking)
 async function blockUser() {
     if (!currentChat || !currentChat.data || currentChat.data.type !== 'private') {
         showNotification('Можно блокировать только в личных чатах', 'error');
@@ -967,29 +973,26 @@ async function blockUser() {
     const otherParticipant = users.get(otherParticipantId);
     const username = otherParticipant?.displayName || otherParticipant?.username || 'этого пользователя';
 
-    if (!confirm(`Отправить запрос на блокировку ${username}? Другой участник должен будет подтвердить.`)) {
+    if (!confirm(`Вы уверены, что хотите заблокировать ${username}? Вы больше не сможете общаться с этим пользователем.`)) {
         return;
     }
 
     try {
-        // Create block request
-        const requestId = Date.now().toString();
-        const blockRequest = {
-            id: requestId,
-            requester: window.currentUser().uid,
-            target: otherParticipantId,
-            chatId: currentChat.id,
-            timestamp: Date.now(),
-            type: 'block_request'
-        };
+        // Add to blocked users list
+        const currentUserId = window.currentUser().uid;
+        const blockedUsersRef = window.dbRef(window.database, `users/${currentUserId}/blockedUsers`);
+        const snapshot = await window.get(blockedUsersRef);
+        const blockedUsers = snapshot.val() || [];
 
-        // Send request to both participants
-        await window.set(window.dbRef(window.database, `blockRequests/${currentChat.id}/${requestId}`), blockRequest);
+        if (!blockedUsers.includes(otherParticipantId)) {
+            blockedUsers.push(otherParticipantId);
+            await window.set(blockedUsersRef, blockedUsers);
+        }
 
-        // Send notification message
+        // Send notification message to the chat
         const notificationMessage = {
-            text: `📋 Запрос на блокировку пользователя отправлен`,
-            sender: window.currentUser().uid,
+            text: `${users.get(currentUserId)?.displayName || users.get(currentUserId)?.username || 'Пользователь'} заблокировал(а) ${username}`,
+            sender: 'system',
             timestamp: Date.now(),
             status: 'sent',
             type: 'system'
@@ -999,91 +1002,21 @@ async function blockUser() {
         const newMessageRef = window.push(messagesRef);
         await window.set(newMessageRef, notificationMessage);
 
-        showNotification('Запрос на блокировку отправлен', 'info');
-
-        // Listen for responses
-        listenForBlockResponses(currentChat.id);
-
-    } catch (error) {
-        console.error('Error requesting block:', error);
-        showNotification('Ошибка отправки запроса', 'error');
-    }
-}
-
-// Listen for Block Responses
-function listenForBlockResponses(chatId) {
-    const responsesRef = window.dbRef(window.database, `blockRequests/${chatId}`);
-    window.onValue(responsesRef, (snapshot) => {
-        const requests = snapshot.val() || {};
-
-        Object.values(requests).forEach(request => {
-            if (request.status === 'accepted' && request.acceptor !== window.currentUser().uid) {
-                // Block the user
-                blockUserConfirmed(request.target);
-                showNotification('Пользователь заблокирован!', 'success');
-            } else if (request.status === 'declined' && request.acceptor !== window.currentUser().uid) {
-                showNotification('Запрос на блокировку отклонен', 'info');
-            }
-        });
-    });
-}
-
-// Handle Block Request (called when user receives a request)
-function handleBlockRequest(request) {
-    if (request.requester === window.currentUser().uid) return; // Don't handle own requests
-
-    const accept = confirm(`Пользователь ${users.get(request.requester)?.displayName || users.get(request.requester)?.username || 'Неизвестный'} хочет вас заблокировать. Принять?`);
-
-    // Update request status
-    const updatedRequest = {
-        ...request,
-        status: accept ? 'accepted' : 'declined',
-        acceptor: window.currentUser().uid,
-        responseTime: Date.now()
-    };
-
-    window.update(window.dbRef(window.database, `blockRequests/${request.chatId}/${request.id}`), updatedRequest);
-}
-
-// Block User Confirmed (after both parties agree)
-async function blockUserConfirmed(targetUserId) {
-    try {
-        const currentUserId = window.currentUser().uid;
-
-        // Add to blocked users list for both users
-        const currentUserBlockedRef = window.dbRef(window.database, `users/${currentUserId}/blockedUsers`);
-        const targetUserBlockedRef = window.dbRef(window.database, `users/${targetUserId}/blockedUsers`);
-
-        // Add to current user's blocked list
-        const currentSnapshot = await window.get(currentUserBlockedRef);
-        const currentBlocked = currentSnapshot.val() || [];
-        if (!currentBlocked.includes(targetUserId)) {
-            currentBlocked.push(targetUserId);
-            await window.set(currentUserBlockedRef, currentBlocked);
-        }
-
-        // Add to target user's blocked list
-        const targetSnapshot = await window.get(targetUserBlockedRef);
-        const targetBlocked = targetSnapshot.val() || [];
-        if (!targetBlocked.includes(currentUserId)) {
-            targetBlocked.push(currentUserId);
-            await window.set(targetUserBlockedRef, targetBlocked);
-        }
-
-        // Remove chat from both users' chat lists
+        // Remove chat from user's chat list
         await window.remove(window.dbRef(window.database, `userChats/${currentUserId}/${currentChat.id}`));
-        await window.remove(window.dbRef(window.database, `userChats/${targetUserId}/${currentChat.id}`));
 
         // Close current chat
         currentChat = null;
         updateChatUI();
         renderChatsList();
 
+        showNotification(`${username} заблокирован`, 'success');
     } catch (error) {
-        console.error('Error confirming block:', error);
+        console.error('Error blocking user:', error);
         showNotification('Ошибка блокировки пользователя', 'error');
     }
 }
+
 
 // Setup Event Listeners
 function setupEventListeners() {
