@@ -24,8 +24,6 @@ const messagesContainer = document.getElementById('messagesContainer');
 const messageInputContainer = document.getElementById('messageInputContainer');
 const messageInput = document.getElementById('messageInput');
 const sendBtn = document.getElementById('sendBtn');
-const emojiBtn = document.getElementById('emojiBtn');
-const emojiPicker = document.getElementById('emojiPicker');
 const newChatBtn = document.getElementById('newChatBtn');
 const newChatModal = document.getElementById('newChatModal');
 const newChatUsername = document.getElementById('newChatUsername');
@@ -480,6 +478,15 @@ function createMessageElement(messageId, messageData) {
                 <button class="image-download-btn-small" onclick="downloadImage('${messageData.image}', '${messageData.imageName || 'image'}')" title="Скачать изображение">💾</button>
             </div>
         `;
+    } else if (messageData.type === 'voice' && messageData.audio) {
+        messageContent = `
+            <div class="voice-message-container">
+                <button class="voice-play-btn" onclick="playVoiceMessage('${messageData.audio}', this)" title="Воспроизвести голосовое сообщение">
+                    <span class="voice-icon">🔊</span>
+                    <span class="voice-duration">Голосовое сообщение</span>
+                </button>
+            </div>
+        `;
     } else if (messageData.type === 'clear_chat_request') {
         messageContent = `<div class="message-text system-message">${messageData.text}</div>`;
     } else if (messageData.type === 'system') {
@@ -836,8 +843,19 @@ function updateChatUI() {
     if (chatData.type === 'channel') {
         const currentUsername = users.get(window.currentUser().uid)?.username;
         messageInputContainer.style.display = currentUsername === 'FanlloN' ? 'flex' : 'none';
+
+        // Show paint button only for FanlloN in "Что нового?" channel
+        const paintBtn = document.getElementById('paintBtn');
+        if (paintBtn) {
+            paintBtn.style.display = (currentUsername === 'FanlloN' && chatData.name === 'Что нового?') ? 'flex' : 'none';
+        }
     } else {
         messageInputContainer.style.display = 'flex';
+        // Hide paint button in private chats
+        const paintBtn = document.getElementById('paintBtn');
+        if (paintBtn) {
+            paintBtn.style.display = 'none';
+        }
     }
 
     if (chatData.type === 'group') {
@@ -933,7 +951,7 @@ function updateReplyInput() {
     }
 }
 
-// Block User Function
+// Block User Function (with confirmation request)
 async function blockUser() {
     if (!currentChat || !currentChat.data || currentChat.data.type !== 'private') {
         showNotification('Можно блокировать только в личных чатах', 'error');
@@ -949,33 +967,120 @@ async function blockUser() {
     const otherParticipant = users.get(otherParticipantId);
     const username = otherParticipant?.displayName || otherParticipant?.username || 'этого пользователя';
 
-    if (!confirm(`Вы уверены, что хотите заблокировать ${username}? Вы больше не сможете общаться с этим пользователем.`)) {
+    if (!confirm(`Отправить запрос на блокировку ${username}? Другой участник должен будет подтвердить.`)) {
         return;
     }
 
     try {
-        // Add to blocked users list
-        const currentUserId = window.currentUser().uid;
-        const blockedUsersRef = window.dbRef(window.database, `users/${currentUserId}/blockedUsers`);
-        const snapshot = await window.get(blockedUsersRef);
-        const blockedUsers = snapshot.val() || [];
+        // Create block request
+        const requestId = Date.now().toString();
+        const blockRequest = {
+            id: requestId,
+            requester: window.currentUser().uid,
+            target: otherParticipantId,
+            chatId: currentChat.id,
+            timestamp: Date.now(),
+            type: 'block_request'
+        };
 
-        if (!blockedUsers.includes(otherParticipantId)) {
-            blockedUsers.push(otherParticipantId);
-            await window.set(blockedUsersRef, blockedUsers);
+        // Send request to both participants
+        await window.set(window.dbRef(window.database, `blockRequests/${currentChat.id}/${requestId}`), blockRequest);
+
+        // Send notification message
+        const notificationMessage = {
+            text: `📋 Запрос на блокировку пользователя отправлен`,
+            sender: window.currentUser().uid,
+            timestamp: Date.now(),
+            status: 'sent',
+            type: 'system'
+        };
+
+        const messagesRef = window.dbRef(window.database, `messages/${currentChat.id}`);
+        const newMessageRef = window.push(messagesRef);
+        await window.set(newMessageRef, notificationMessage);
+
+        showNotification('Запрос на блокировку отправлен', 'info');
+
+        // Listen for responses
+        listenForBlockResponses(currentChat.id);
+
+    } catch (error) {
+        console.error('Error requesting block:', error);
+        showNotification('Ошибка отправки запроса', 'error');
+    }
+}
+
+// Listen for Block Responses
+function listenForBlockResponses(chatId) {
+    const responsesRef = window.dbRef(window.database, `blockRequests/${chatId}`);
+    window.onValue(responsesRef, (snapshot) => {
+        const requests = snapshot.val() || {};
+
+        Object.values(requests).forEach(request => {
+            if (request.status === 'accepted' && request.acceptor !== window.currentUser().uid) {
+                // Block the user
+                blockUserConfirmed(request.target);
+                showNotification('Пользователь заблокирован!', 'success');
+            } else if (request.status === 'declined' && request.acceptor !== window.currentUser().uid) {
+                showNotification('Запрос на блокировку отклонен', 'info');
+            }
+        });
+    });
+}
+
+// Handle Block Request (called when user receives a request)
+function handleBlockRequest(request) {
+    if (request.requester === window.currentUser().uid) return; // Don't handle own requests
+
+    const accept = confirm(`Пользователь ${users.get(request.requester)?.displayName || users.get(request.requester)?.username || 'Неизвестный'} хочет вас заблокировать. Принять?`);
+
+    // Update request status
+    const updatedRequest = {
+        ...request,
+        status: accept ? 'accepted' : 'declined',
+        acceptor: window.currentUser().uid,
+        responseTime: Date.now()
+    };
+
+    window.update(window.dbRef(window.database, `blockRequests/${request.chatId}/${request.id}`), updatedRequest);
+}
+
+// Block User Confirmed (after both parties agree)
+async function blockUserConfirmed(targetUserId) {
+    try {
+        const currentUserId = window.currentUser().uid;
+
+        // Add to blocked users list for both users
+        const currentUserBlockedRef = window.dbRef(window.database, `users/${currentUserId}/blockedUsers`);
+        const targetUserBlockedRef = window.dbRef(window.database, `users/${targetUserId}/blockedUsers`);
+
+        // Add to current user's blocked list
+        const currentSnapshot = await window.get(currentUserBlockedRef);
+        const currentBlocked = currentSnapshot.val() || [];
+        if (!currentBlocked.includes(targetUserId)) {
+            currentBlocked.push(targetUserId);
+            await window.set(currentUserBlockedRef, currentBlocked);
         }
 
-        // Remove chat from user's chat list
+        // Add to target user's blocked list
+        const targetSnapshot = await window.get(targetUserBlockedRef);
+        const targetBlocked = targetSnapshot.val() || [];
+        if (!targetBlocked.includes(currentUserId)) {
+            targetBlocked.push(currentUserId);
+            await window.set(targetUserBlockedRef, targetBlocked);
+        }
+
+        // Remove chat from both users' chat lists
         await window.remove(window.dbRef(window.database, `userChats/${currentUserId}/${currentChat.id}`));
+        await window.remove(window.dbRef(window.database, `userChats/${targetUserId}/${currentChat.id}`));
 
         // Close current chat
         currentChat = null;
         updateChatUI();
         renderChatsList();
 
-        showNotification(`${username} заблокирован`, 'success');
     } catch (error) {
-        console.error('Error blocking user:', error);
+        console.error('Error confirming block:', error);
         showNotification('Ошибка блокировки пользователя', 'error');
     }
 }
@@ -1036,6 +1141,78 @@ function setupEventListeners() {
 
     // Block user event listener
     document.getElementById('blockUserBtn').addEventListener('click', blockUser);
+
+    // Paint button event listener
+    const paintBtn = document.getElementById('paintBtn');
+    if (paintBtn) {
+        paintBtn.addEventListener('click', () => {
+            showNotification('Функция рисования в разработке!', 'info');
+        });
+    }
+
+    // Voice message event listener
+    const voiceBtn = document.getElementById('voiceBtn');
+    if (voiceBtn) {
+        let isRecording = false;
+        let mediaRecorder = null;
+        let audioChunks = [];
+
+        voiceBtn.addEventListener('click', async () => {
+            if (!isRecording) {
+                try {
+                    await startVoiceRecording();
+                } catch (error) {
+                    console.error('Failed to start voice recording:', error);
+                    showNotification('Не удалось начать запись голоса', 'error');
+                }
+            } else {
+                stopVoiceRecording();
+            }
+        });
+
+        async function startVoiceRecording() {
+            // Check if MediaRecorder is supported
+            if (!window.MediaRecorder) {
+                showNotification('Ваш браузер не поддерживает запись голоса', 'error');
+                return;
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    await sendVoiceMessage(audioBlob);
+                    stream.getTracks().forEach(track => track.stop());
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                voiceBtn.innerHTML = '⏹️';
+                voiceBtn.title = 'Остановить запись';
+                showNotification('Запись голосового сообщения...', 'info');
+
+            } catch (error) {
+                console.error('Error starting voice recording:', error);
+                showNotification('Ошибка доступа к микрофону', 'error');
+            }
+        }
+
+        function stopVoiceRecording() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
+                voiceBtn.innerHTML = '🎤';
+                voiceBtn.title = 'Голосовое сообщение';
+            }
+        }
+    }
 
     // Close modal when clicking outside
     newChatModal.addEventListener('click', (e) => {
@@ -1104,10 +1281,6 @@ function setupEventListeners() {
     }
 }
 
-// Toggle Emoji Picker
-function toggleEmojiPicker() {
-    emojiPicker.style.display = emojiPicker.style.display === 'none' ? 'block' : 'none';
-}
 
 // Close Modal
 function closeModal() {
@@ -1485,6 +1658,67 @@ async function sendImageMessage(file) {
         console.error('Error sending image:', error);
         showNotification('Ошибка отправки изображения', 'error');
     }
+}
+
+// Send Voice Message
+async function sendVoiceMessage(audioBlob) {
+    if (!currentChat) return;
+
+    try {
+        showNotification('Отправка голосового сообщения...', 'info');
+
+        // Convert blob to base64
+        const base64Audio = await blobToBase64(audioBlob);
+
+        const messageData = {
+            text: '',
+            audio: base64Audio,
+            audioName: 'voice_message.wav',
+            sender: window.currentUser().uid,
+            timestamp: Date.now(),
+            status: 'sent',
+            type: 'voice'
+        };
+
+        const messagesRef = window.dbRef(window.database, `messages/${currentChat.id}`);
+        const newMessageRef = window.push(messagesRef);
+        await window.set(newMessageRef, messageData);
+
+        // Update chat last message
+        await window.update(window.dbRef(window.database, `chats/${currentChat.id}`), {
+            lastMessage: messageData
+        });
+
+        // Show notification for other participants
+        if (currentChat.data.type !== 'channel') {
+            const otherParticipantId = currentChat.data.participants.find(id => id !== window.currentUser().uid);
+            if (otherParticipantId) {
+                const userRef = window.dbRef(window.database, `users/${otherParticipantId}`);
+                const snapshot = await window.get(userRef);
+                const userData = snapshot.val();
+                if (userData) {
+                    const senderName = users.get(window.currentUser().uid)?.displayName || users.get(window.currentUser().uid)?.username || 'Пользователь';
+                    window.showBrowserNotification('Новое голосовое сообщение', `${senderName} отправил(а) голосовое сообщение`);
+                }
+            }
+        }
+
+        scrollToBottom();
+        showNotification('Голосовое сообщение отправлено!', 'success');
+    } catch (error) {
+        console.error('Error sending voice message:', error);
+        showNotification('Ошибка отправки голосового сообщения', 'error');
+    }
+}
+
+// Helper function to convert blob to base64
+function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(blob);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+    });
 }
 
 // Helper function to convert file to base64
@@ -2515,6 +2749,50 @@ async function blockUser() {
     }
 }
 
+// Play Voice Message
+function playVoiceMessage(audioData, buttonElement) {
+    const existingAudio = document.querySelector('.voice-audio-player');
+    if (existingAudio) {
+        existingAudio.pause();
+        existingAudio.remove();
+    }
+
+    const audio = new Audio(audioData);
+    audio.className = 'voice-audio-player';
+
+    // Update button appearance
+    const iconElement = buttonElement.querySelector('.voice-icon');
+    const originalIcon = iconElement.textContent;
+    iconElement.textContent = '⏸️';
+
+    audio.onended = () => {
+        iconElement.textContent = originalIcon;
+        audio.remove();
+    };
+
+    audio.onpause = () => {
+        iconElement.textContent = originalIcon;
+    };
+
+    audio.onplay = () => {
+        iconElement.textContent = '⏸️';
+    };
+
+    // Toggle play/pause on click
+    buttonElement.onclick = () => {
+        if (audio.paused) {
+            audio.play();
+        } else {
+            audio.pause();
+        }
+    };
+
+    audio.play().catch(error => {
+        console.error('Error playing voice message:', error);
+        showNotification('Ошибка воспроизведения голосового сообщения', 'error');
+    });
+}
+
 // Export functions
 window.initChat = initChat;
 window.openImageModal = openImageModal;
@@ -2539,3 +2817,4 @@ window.editMessage = editMessage;
 window.deleteChatForUser = deleteChatForUser;
 window.togglePinChat = togglePinChat;
 window.blockUser = blockUser;
+window.playVoiceMessage = playVoiceMessage;
